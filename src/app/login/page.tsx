@@ -1,12 +1,19 @@
+import Link from 'next/link';
 import { signIn } from '@/app/actions';
 import { ActionForm } from '@/components/forms';
 
-export default function Login() {
+export default async function Login({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
   return (
     <main className="min-h-screen grid place-items-center px-6">
       <div className="w-full max-w-sm">
         <h1 className="wide text-3xl font-bold">CTA Post Tracker</h1>
         <p className="text-ink-soft mt-1 mb-8">Team sign-in. Ask an admin for an invite if you don’t have an account.</p>
+        {error === 'link' && (
+          <p role="alert" className="text-sm text-flag bg-flag-soft rounded-md px-3 py-2 mb-6">
+            That link has expired or was already used. Ask for a new invite, or reset your password below.
+          </p>
+        )}
         <ActionForm action={signIn} submit="Sign in">
           <div className="space-y-3">
             <label className="block text-sm">
@@ -19,6 +26,9 @@ export default function Login() {
             </label>
           </div>
         </ActionForm>
+        <Link href="/login/forgot" className="inline-block mt-6 text-sm underline underline-offset-4 text-ink-soft hover:text-ink">
+          Forgot password?
+        </Link>
       </div>
     </main>
   );

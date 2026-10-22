@@ -1,7 +1,7 @@
 // Runs the real migration in embedded Postgres and checks the metric rules from CLAUDE.md.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 
 const db = new PGlite();
@@ -12,10 +12,11 @@ const ist = (s) => `${s}+05:30`;
 const NOW = ist('2026-11-25 12:00');
 
 before(async () => {
-  let sql = readFileSync(new URL('../supabase/migrations/20261022000000_init.sql', import.meta.url), 'utf8');
-  sql = sql.replace(/create extension[^;]+;/g, '');
+  const dir = new URL('../supabase/migrations/', import.meta.url);
   await db.exec(`create role anon; create role authenticated; create role service_role;`);
-  await db.exec(sql);
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
+    await db.exec(readFileSync(new URL(f, dir), 'utf8').replace(/create extension[^;]+;/g, ''));
+  }
   // Freeze now() for the metrics function.
   await db.exec(`create schema fake; create function fake.now() returns timestamptz
     language sql as $$ select '${NOW}'::timestamptz $$; set search_path = fake, public, pg_catalog;`);
@@ -131,4 +132,17 @@ test('a collab post can count for two students', async () => {
   await post(b, 'collab1', '2026-11-05 10:00');
   assert.equal((await metrics(a)).total_posts, 1);
   assert.equal((await metrics(b)).total_posts, 1);
+});
+
+test('saving a new scrape time moves the cron job; non-weekly schedules are refused', async () => {
+  // Stand-in for pg_cron, which PGlite doesn't ship.
+  await db.exec(`create schema cron;
+    create table cron.job (jobid bigint, jobname text, schedule text);
+    insert into cron.job values (1, 'cta-weekly-scrape', '30 0 * * 1');
+    create function cron.alter_job(job_id bigint, schedule text) returns void language sql as
+      $$ update cron.job set schedule = alter_job.schedule where jobid = job_id $$;`);
+  await db.exec(`update settings set scrape_cron = '30 20 * * 0'`);
+  const { rows } = await db.query(`select schedule from cron.job where jobid = 1`);
+  assert.equal(rows[0].schedule, '30 20 * * 0');
+  await assert.rejects(db.exec(`update settings set scrape_cron = '*/5 * * * *'`), /scrape_cron_weekly/);
 });

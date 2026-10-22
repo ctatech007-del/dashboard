@@ -1,10 +1,12 @@
 import { teamClient } from '@/lib/supabase';
 import { saveSettings } from '@/app/actions';
 import { ActionForm } from '@/components/forms';
+import { cronToIst, WEEKDAYS } from '@/lib/format';
 
 export default async function Settings() {
   const { db } = await teamClient();
   const { data: cfg } = await db.from('settings').select('*').single();
+  const schedule = cronToIst(cfg?.scrape_cron ?? '') ?? { dow: 1, time: '06:00' };
 
   return (
     <>
@@ -33,11 +35,23 @@ export default async function Settings() {
               </span>
               <input name="sheet_id" defaultValue={cfg?.sheet_id ?? ''} placeholder="https://docs.google.com/spreadsheets/d/…" className="field" />
             </label>
+            <fieldset className="text-sm">
+              <legend className="block font-semibold">Weekly scrape</legend>
+              <span className="block text-ink-soft mb-2">Day and time it runs, Indian time.</span>
+              <div className="flex gap-3">
+                <select name="scrape_day" defaultValue={schedule.dow} aria-label="Scrape day" className="field max-w-40">
+                  {WEEKDAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
+                </select>
+                <input name="scrape_time" type="time" required defaultValue={schedule.time}
+                  aria-label="Scrape time (IST)" className="field max-w-32" />
+              </div>
+            </fieldset>
           </div>
         </ActionForm>
       </section>
       <p className="text-sm text-ink-soft mt-6 max-w-xl">
-        The scrape runs every Monday at 6:00 AM IST. Team members are invited from the Supabase dashboard.
+        Team members are invited from the Supabase dashboard (Authentication → Users → Invite). They get an
+        email to set their own password; anyone can reset theirs from “Forgot password?” on the sign-in page.
       </p>
     </>
   );

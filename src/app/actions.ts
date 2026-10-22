@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { supabase, teamClient } from '@/lib/supabase';
-import { parseCsv } from '@/lib/format';
+import { istToCron, parseCsv } from '@/lib/format';
 
 export type FormState = { error?: string; message?: string } | undefined;
 
@@ -27,6 +27,27 @@ export async function signOut() {
   const db = await supabase();
   await db.auth.signOut();
   redirect('/login');
+}
+
+// The reset email links to /login/confirm (see README: Auth email templates).
+export async function requestPasswordReset(_: FormState, form: FormData): Promise<FormState> {
+  const email = String(form.get('email') ?? '').trim();
+  if (!email) return { error: 'Enter your email.' };
+  const db = await supabase();
+  await db.auth.resetPasswordForEmail(email);
+  // Same answer either way, so the form doesn't reveal who has an account.
+  return { message: 'If that email belongs to a team member, a reset link is on its way.' };
+}
+
+/** Sets a password for whoever arrived from an invite or reset link. */
+export async function setPassword(_: FormState, form: FormData): Promise<FormState> {
+  const { db } = await teamClient();
+  const password = String(form.get('password') ?? '');
+  if (password.length < 8) return { error: 'Use at least 8 characters.' };
+  if (password !== form.get('confirm')) return { error: 'The two passwords don’t match.' };
+  const { error } = await db.auth.updateUser({ password });
+  if (error) return { error: error.message };
+  redirect('/');
 }
 
 // ───────────── scraping ─────────────
@@ -141,11 +162,14 @@ export async function saveSettings(_: FormState, form: FormData): Promise<FormSt
   }
   const sheetRaw = String(form.get('sheet_id') ?? '').trim();
   const sheet_id = sheetRaw.match(/\/d\/([\w-]+)/)?.[1] ?? (sheetRaw || null);
+  // A trigger on settings moves the pg_cron job to the new time.
+  const scrape_cron = istToCron(Number(form.get('scrape_day')), String(form.get('scrape_time') ?? ''));
+  if (!scrape_cron) return { error: 'Pick a scrape day and time.' };
 
   const { error } = await db.from('settings').update({
     streak_threshold: threshold,
     milestones: [...new Set(milestones)].sort((a, b) => a - b),
-    sheet_id, updated_at: new Date().toISOString(),
+    sheet_id, scrape_cron, updated_at: new Date().toISOString(),
   }).eq('id', 1);
   if (error) return { error: error.message };
   revalidatePath('/', 'layout');

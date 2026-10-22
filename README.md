@@ -7,10 +7,14 @@ Internal dashboard that tracks Creator Takeoff Academy students' Instagram posti
 
 ### 1. Supabase
 1. Create a project (region: Mumbai).
-2. Run the migration: `supabase link --project-ref <ref>` then `supabase db push`
-   (or paste `supabase/migrations/20261022000000_init.sql` into the SQL editor).
-3. **Auth → Providers → Email:** turn off "Allow new users to sign up". Invite each team member
-   from **Auth → Users**.
+2. Run the migrations: `supabase link --project-ref <ref>` then `supabase db push`
+   (or paste each file in `supabase/migrations/`, in order, into the SQL editor).
+3. **Auth → Providers → Email:** turn off "Allow new users to sign up", and turn on leaked
+   password protection. Invite each team member from **Auth → Users**.
+   - **Auth → URL Configuration:** Site URL = the Vercel URL (e.g. `https://cta-tracker.vercel.app`).
+   - **Auth → Email Templates:** point the links at the app so invites and resets work:
+     - *Invite user:* `<a href="{{ .SiteURL }}/login/confirm?token_hash={{ .TokenHash }}&type=invite">Accept the invite</a>`
+     - *Reset password:* `<a href="{{ .SiteURL }}/login/confirm?token_hash={{ .TokenHash }}&type=recovery">Choose a new password</a>`
 4. Edge Function secrets (**Edge Functions → Secrets**):
    - `APIFY_TOKEN`: from Apify → Settings → Integrations
    - `FUNCTION_SECRET`: any long random string (`openssl rand -hex 32`)

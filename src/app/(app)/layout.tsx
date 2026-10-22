@@ -26,9 +26,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="text-xs text-ink-soft">100 Post Challenge</span>
         </Link>
         <NavLinks flags={flags ?? 0} />
-        <form action={signOut} className="hidden md:block mt-auto">
-          <p className="text-xs text-ink-soft truncate mb-2" title={user.email}>{user.email}</p>
-          <button className="text-sm underline underline-offset-4 text-ink-soft hover:text-ink">Sign out</button>
+        <form action={signOut} className="ml-auto md:ml-0 md:mt-auto shrink-0 self-center md:self-auto">
+          <p className="hidden md:block text-xs text-ink-soft truncate mb-2" title={user.email}>{user.email}</p>
+          <button className="text-sm underline underline-offset-4 text-ink-soft hover:text-ink whitespace-nowrap">Sign out</button>
         </form>
       </aside>
 

@@ -12,7 +12,7 @@ export function NavLinks({ flags }: { flags: number }) {
     { href: '/settings', label: 'Settings' },
   ];
   return (
-    <nav className="flex md:flex-col gap-1 text-sm overflow-x-auto">
+    <nav className="flex md:flex-col gap-1 text-sm overflow-x-auto min-w-0">
       {items.map((i) => {
         const active = i.active ?? path.startsWith(i.href);
         return (
