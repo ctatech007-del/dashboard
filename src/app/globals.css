@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #16233f;
+  --ink-soft: #55607a;
+  --paper: #f6f8fb;
+  --surface: #ffffff;
+  --rule: #dce2eb;
+  --amber: #e89b2f;
+  --amber-soft: #fdf1de;
+  --ok: #2f8f64;
+  --flag: #c8414f;
+  --flag-soft: #fbe9eb;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-rule: var(--rule);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-ok: var(--ok);
+  --color-flag: var(--flag);
+  --color-flag-soft: var(--flag-soft);
+  --font-sans: var(--font-archivo);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-archivo), system-ui, sans-serif;
+  font-variation-settings: "wdth" 100;
+}
+
+/* Expanded width for headings and the numbers that matter */
+.wide {
+  font-variation-settings: "wdth" 125;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+.tnum { font-feature-settings: "tnum" 1; }
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.9rem;
+}
+.field:focus { border-color: var(--ink); outline: none; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn:disabled { opacity: 0.5; }
+.btn-quiet {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
 }

@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CTA Post Tracker
 
-## Getting Started
+Internal dashboard that tracks Creator Takeoff Academy students' Instagram posting for the
+100 Post Challenge. Scope, rules and architecture: see [CLAUDE.md](CLAUDE.md).
 
-First, run the development server:
+## Setup (all on CTA-owned accounts)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### 1. Supabase
+1. Create a project (region: Mumbai).
+2. Run the migration: `supabase link --project-ref <ref>` then `supabase db push`
+   (or paste `supabase/migrations/20261022000000_init.sql` into the SQL editor).
+3. **Auth → Providers → Email:** turn off "Allow new users to sign up". Invite each team member
+   from **Auth → Users**.
+4. Edge Function secrets (**Edge Functions → Secrets**):
+   - `APIFY_TOKEN`: from Apify → Settings → Integrations
+   - `FUNCTION_SECRET`: any long random string (`openssl rand -hex 32`)
+   - `GOOGLE_SERVICE_ACCOUNT_JSON`: the service account key JSON (optional, for Sheet sync)
+5. Deploy functions:
+   `supabase functions deploy scrape-start scrape-ingest sheets-sync --no-verify-jwt`
+   (they authenticate with `FUNCTION_SECRET` instead of a Supabase JWT).
+6. Schedule: save the `FUNCTION_SECRET` in Vault as `function_secret`, then run:
+
+```sql
+select cron.schedule('cta-weekly-scrape', '30 0 * * 1', $$
+  select net.http_post(
+    url := 'https://<project-ref>.supabase.co/functions/v1/scrape-start',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-function-secret', (select decrypted_secret from vault.decrypted_secrets
+                            where name = 'function_secret')),
+    body := '{"trigger":"schedule"}'::jsonb);
+$$);
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`30 0 * * 1` = Monday 00:30 UTC = **Monday 06:00 IST**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Google Sheet (optional)
+Create a Google Cloud service account with the Sheets API enabled, download its JSON key, share
+the Sheet with the service account's email as Editor, and paste the Sheet link in **Settings**.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Vercel
+Import the repo, set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and
+`FUNCTION_SECRET` (see `.env.example`), deploy.
 
-## Learn More
+## Before go-live
+- Run one scrape on 3–5 real handles (one private, one renamed) and check the Apify field names
+  in `supabase/functions/_shared/apify.ts` still match the actor output.
+- Confirm Trial Reels don't show up in the profile scraper's posts.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Develop
+```bash
+npm install
+cp .env.example .env.local   # fill in
+npm run dev
+npm test                      # metric rules against the real schema + scraper parser
+```
