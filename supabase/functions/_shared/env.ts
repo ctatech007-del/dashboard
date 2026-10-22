@@ -16,6 +16,17 @@ export function authorized(req: Request): boolean {
   return !!FUNCTION_SECRET && key === FUNCTION_SECRET;
 }
 
+/** Readable text for anything thrown, including Supabase errors (plain objects, not Errors). */
+export function errorText(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object') {
+    const { message, details, hint, code } = e as Record<string, unknown>;
+    if (message) return [message, details, hint, code && `(${code})`].filter(Boolean).join(' · ');
+    return JSON.stringify(e);
+  }
+  return String(e);
+}
+
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status, headers: { 'Content-Type': 'application/json' },

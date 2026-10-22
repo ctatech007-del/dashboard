@@ -7,10 +7,10 @@ type Action = (state: FormState, form: FormData) => Promise<FormState>;
 
 /** A form wired to a server action, with its result shown underneath. */
 export function ActionForm({
-  action, children, submit, className = '', resetOnSuccess = false,
+  action, children, submit, className = '', resetOnSuccess = false, quiet = false,
 }: {
   action: Action; children?: React.ReactNode; submit: string; className?: string;
-  resetOnSuccess?: boolean;
+  resetOnSuccess?: boolean; quiet?: boolean;
 }) {
   const [state, run, pending] = useActionState(action, undefined);
   return (
@@ -21,7 +21,7 @@ export function ActionForm({
     >
       {children}
       <div className="flex flex-wrap items-center gap-3 mt-3">
-        <button className="btn" disabled={pending}>{pending ? 'Working…' : submit}</button>
+        <button className={quiet ? 'btn btn-quiet' : 'btn'} disabled={pending}>{pending ? 'Working…' : submit}</button>
         <Result state={state} />
       </div>
     </form>

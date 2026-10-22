@@ -22,14 +22,14 @@ export default async function Roster({
 
   return (
     <>
-      <h1 className="wide text-3xl font-bold mb-6">Roster</h1>
+      <h1 className="wide text-3xl md:text-4xl font-bold mb-6">Roster</h1>
 
       <datalist id="batch-names">
         {batches?.map((b) => <option key={b.name} value={b.name} />)}
       </datalist>
 
       {editing && (
-        <section className="bg-surface border-2 border-ink rounded-lg p-5 mb-8">
+        <section className="bg-surface border-2 border-lime rounded-lg p-5 mb-8">
           <div className="flex justify-between items-baseline">
             <h2 className="wide text-lg font-bold">Edit {editing.name}</h2>
             <Link href="/roster" className="text-sm text-ink-soft hover:text-ink">Close</Link>

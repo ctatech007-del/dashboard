@@ -19,8 +19,11 @@ Internal dashboard that tracks Creator Takeoff Academy students' Instagram posti
    - `APIFY_TOKEN`: from Apify → Settings → Integrations
    - `FUNCTION_SECRET`: any long random string (`openssl rand -hex 32`)
    - `GOOGLE_SERVICE_ACCOUNT_JSON`: the service account key JSON (optional, for Sheet sync)
+   - `RESEND_API_KEY` and `ALERT_FROM` (optional, for failure alert emails): a Resend API key
+     and a sender on a domain verified in Resend, e.g. `CTA Tracker <alerts@creatortakeoff.com>`.
+     Then add the recipients in the app under **Settings → Alert emails**.
 5. Deploy functions:
-   `supabase functions deploy scrape-start scrape-ingest sheets-sync --no-verify-jwt`
+   `supabase functions deploy scrape-start scrape-ingest sheets-sync health --no-verify-jwt`
    (they authenticate with `FUNCTION_SECRET` instead of a Supabase JWT).
 6. Schedule: save the `FUNCTION_SECRET` in Vault as `function_secret`, then run:
 

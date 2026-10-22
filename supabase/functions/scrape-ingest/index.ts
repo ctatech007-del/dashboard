@@ -1,6 +1,7 @@
 // Apify webhook target. phase=profiles → ingest profile results, maybe start overflow scrape.
 // phase=overflow → ingest extra posts. Both end in finalize(): metrics + Google Sheet sync.
-import { authorized, datasetItems, db, fnUrl, json, startActor } from '../_shared/env.ts';
+import { authorized, datasetItems, db, errorText, fnUrl, json, startActor } from '../_shared/env.ts';
+import { alert } from '../_shared/alert.ts';
 import {
   cleanHandle, missingHandles, normalizePost, parseProfile,
   type NormalizedPost, type Outcome, type RawPost, type RawProfile,
@@ -32,22 +33,27 @@ Deno.serve(async (req) => {
     return json({ error: 'bad phase' }, 400);
   } catch (e) {
     await db.from('scrape_runs').update({
-      status: 'failed', error: String(e), finished_at: new Date().toISOString(),
+      status: 'failed', error: errorText(e), finished_at: new Date().toISOString(),
     }).eq('id', runId);
-    return json({ error: String(e) }, 500);
+    await alert('Scrape failed', `A scrape stopped part-way, so some numbers may be out of date.\n\n${errorText(e)}`);
+    return json({ error: errorText(e) }, 500);
   }
 });
 
-async function activeStudents(): Promise<Student[]> {
-  const { data, error } = await db.from('students')
+/** The run's students: everyone active, or just the ones a single-student re-scrape asked for. */
+async function activeStudents(runId: string): Promise<Student[]> {
+  const { data: run } = await db.from('scrape_runs').select('student_ids').eq('id', runId).single();
+  let query = db.from('students')
     .select('id, ig_handle, ig_user_id, start_date').eq('status', 'active');
+  if (run?.student_ids?.length) query = query.in('id', run.student_ids);
+  const { data, error } = await query;
   if (error) throw error;
   return data;
 }
 
 async function ingestProfiles(runId: string, resource: { defaultDatasetId: string } | null) {
   await db.from('scrape_runs').update({ status: 'ingesting' }).eq('id', runId);
-  const students = await activeStudents();
+  const students = await activeStudents(runId);
 
   if (!resource) {
     // Whole run failed: every student gets a visible error for this run, nothing is carried over.
@@ -115,7 +121,7 @@ async function ingestProfiles(runId: string, resource: { defaultDatasetId: strin
 }
 
 async function ingestOverflow(runId: string, datasetId: string) {
-  const students = await activeStudents();
+  const students = await activeStudents(runId);
   const byHandle = new Map(students.map((s) => [cleanHandle(s.ig_handle), s]));
   const items = await datasetItems<RawPost>(datasetId);
 
@@ -164,12 +170,24 @@ async function finalize(runId: string, warning: string | null) {
 
   const { count } = await db.from('scrape_results').select('*', { count: 'exact', head: true })
     .eq('run_id', runId).eq('outcome', 'ok');
-  await db.from('scrape_runs').update({
+  const { data: run } = await db.from('scrape_runs').update({
     status: 'done', profiles_ok: count ?? 0, error: warning,
     finished_at: new Date().toISOString(),
-  }).eq('id', runId);
+  }).eq('id', runId).select('profiles_total, trigger').single();
 
   // Sheet sync is best-effort: a Sheets outage must not fail the scrape.
   const sync = await fetch(fnUrl('sheets-sync'), { method: 'POST' }).catch((e) => e);
-  return { run: runId, ok: count, sheet: sync instanceof Response ? sync.status : String(sync) };
+  const sheet = sync instanceof Response
+    ? (sync.ok ? 'ok' : `${sync.status} ${(await sync.text()).slice(0, 300)}`)
+    : String(sync);
+  await db.from('scrape_runs').update({ sheet_status: sheet }).eq('id', runId);
+
+  const total = run?.profiles_total ?? 0;
+  const missed = total - (count ?? 0);
+  if (warning || missed > 0) {
+    await alert(`${missed} of ${total} profiles couldn't be read`,
+      `The ${run?.trigger ?? ''} scrape finished, but ${missed} of ${total} profiles couldn't be read.` +
+      `${warning ? `\n\n${warning}` : ''}\n\nOpen Attention in the tracker to see who and what to do.`);
+  }
+  return { run: runId, ok: count, sheet };
 }

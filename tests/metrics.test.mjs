@@ -13,7 +13,10 @@ const NOW = ist('2026-11-25 12:00');
 
 before(async () => {
   const dir = new URL('../supabase/migrations/', import.meta.url);
-  await db.exec(`create role anon; create role authenticated; create role service_role;`);
+  await db.exec(`create role anon; create role authenticated; create role service_role;
+    create schema auth; create table auth.who (email text);
+    create function auth.jwt() returns jsonb language sql as
+      $$ select coalesce((select jsonb_build_object('email', email) from auth.who limit 1), '{}') $$;`);
   for (const f of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
     await db.exec(readFileSync(new URL(f, dir), 'utf8').replace(/create extension[^;]+;/g, ''));
   }
@@ -145,4 +148,45 @@ test('saving a new scrape time moves the cron job; non-weekly schedules are refu
   const { rows } = await db.query(`select schedule from cron.job where jobid = 1`);
   assert.equal(rows[0].schedule, '30 20 * * 0');
   await assert.rejects(db.exec(`update settings set scrape_cron = '*/5 * * * *'`), /scrape_cron_weekly/);
+});
+
+test('an excluded post stops counting; a manual post counts; both are in the audit log', async () => {
+  const s = await student('I', 'iii', 'Dec', '2026-11-01');
+  await post(s, 'keep1', '2026-11-03 10:00');
+  await post(s, 'drop1', '2026-11-04 10:00');
+  assert.equal((await metrics(s)).total_posts, 2);
+
+  await db.exec(`insert into auth.who values ('coach@cta.test')`);
+  await db.query(`update posts set excluded = true, excluded_reason = 'story repost' where shortcode = 'drop1'`);
+  await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url, source)
+    values ($1, 'missed1', 'reel', $2, 'u', 'manual')`, [s, ist('2026-11-05 10:00')]);
+  await db.exec(`delete from auth.who`);
+
+  const m = await metrics(s);
+  assert.equal(m.total_posts, 2); // keep1 + missed1
+  const { rows: log } = await db.query(
+    `select actor, action from audit_log where student_id = $1 order by id`, [s]);
+  assert.deepEqual(log.slice(-2), [
+    { actor: 'coach@cta.test', action: 'posts.update' },
+    { actor: 'coach@cta.test', action: 'posts.insert' },
+  ]);
+});
+
+test('monthly counts follow IST calendar months and skip excluded posts', async () => {
+  const s = await student('J', 'jjj', 'Dec', '2026-10-01');
+  await post(s, 'm1', '2026-10-31 23:30'); // still October in IST
+  await post(s, 'm2', '2026-11-01 00:30');
+  await post(s, 'm3', '2026-11-02 09:00');
+  await db.query(`update posts set excluded = true where shortcode = 'm3'`);
+  const { rows } = await db.query(
+    `select month::text, posts from monthly_stats where student_id = $1 order by month`, [s]);
+  assert.deepEqual(rows, [{ month: '2026-10-01', posts: 1 }, { month: '2026-11-01', posts: 1 }]);
+});
+
+test('functions called through the Supabase API never DELETE without a WHERE (pg-safeupdate)', async () => {
+  const { rows } = await db.query(`select proname, prosrc from pg_proc
+    where proname in ('recompute_metrics', 'refresh_metrics', 'audit', 'sync_scrape_schedule')`);
+  for (const r of rows) {
+    assert.doesNotMatch(r.prosrc, /delete\s+from\s+[\w.]+\s*;/i, `${r.proname} has an unguarded DELETE`);
+  }
 });

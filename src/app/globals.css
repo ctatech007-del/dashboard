@@ -1,16 +1,26 @@
 @import "tailwindcss";
 
+/* Dark base with neon accent cards. Text on a neon card is always --on-neon. */
 :root {
-  --ink: #16233f;
-  --ink-soft: #55607a;
-  --paper: #f6f8fb;
-  --surface: #ffffff;
-  --rule: #dce2eb;
-  --amber: #e89b2f;
-  --amber-soft: #fdf1de;
-  --ok: #2f8f64;
-  --flag: #c8414f;
-  --flag-soft: #fbe9eb;
+  color-scheme: dark;
+  --ink: #f4f4f2;
+  --ink-soft: #9a9a96;
+  --paper: #050505;
+  --surface: #121212;
+  --rule: #262626;
+  --on-neon: #0a0a0a;
+
+  --lime: #e6f23e;
+  --pink: #f06db6;
+  --green: #36e07a;
+  --blue: #4c8dff;
+
+  /* Semantic names the pages use */
+  --amber: var(--lime);
+  --amber-soft: color-mix(in srgb, var(--lime) 16%, transparent);
+  --ok: var(--green);
+  --flag: var(--pink);
+  --flag-soft: color-mix(in srgb, var(--pink) 18%, transparent);
 }
 
 @theme inline {
@@ -19,12 +29,19 @@
   --color-paper: var(--paper);
   --color-surface: var(--surface);
   --color-rule: var(--rule);
+  --color-on-neon: var(--on-neon);
+  --color-lime: var(--lime);
+  --color-pink: var(--pink);
+  --color-green: var(--green);
+  --color-blue: var(--blue);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
   --color-ok: var(--ok);
   --color-flag: var(--flag);
   --color-flag-soft: var(--flag-soft);
   --font-sans: var(--font-archivo);
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
 }
 
 body {
@@ -44,36 +61,63 @@ body {
 .tnum { font-feature-settings: "tnum" 1; }
 
 :focus-visible {
-  outline: 2px solid var(--amber);
+  outline: 2px solid var(--lime);
   outline-offset: 2px;
 }
+
+/* A solid neon card, as in the brand reference */
+.neon {
+  color: var(--on-neon);
+  border-radius: var(--radius-lg);
+}
+.neon a { color: inherit; }
 
 .field {
   width: 100%;
   border: 1px solid var(--rule);
-  background: var(--surface);
-  border-radius: 6px;
-  padding: 0.5rem 0.65rem;
+  background: #0b0b0b;
+  color: var(--ink);
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.8rem;
   font-size: 0.9rem;
 }
 .field:focus { border-color: var(--ink); outline: none; }
+.field::placeholder { color: #5f5f5c; }
 
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
-  border-radius: 6px;
-  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
   font-size: 0.875rem;
   font-weight: 600;
   background: var(--ink);
-  color: var(--paper);
+  color: var(--on-neon);
+  white-space: nowrap;
 }
+.btn:hover { background: #ffffff; }
 .btn:disabled { opacity: 0.5; }
 .btn-quiet {
   background: transparent;
   color: var(--ink);
-  border: 1px solid var(--rule);
+  border: 1px solid #3a3a3a;
+}
+.btn-quiet:hover { background: transparent; border-color: var(--ink); }
+
+/* Pill progress bar with a dot at the current value */
+.track {
+  position: relative;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+}
+.track > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 @media (prefers-reduced-motion: reduce) {

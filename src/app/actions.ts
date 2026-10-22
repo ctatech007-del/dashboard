@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { supabase, teamClient } from '@/lib/supabase';
 import { istToCron, parseCsv } from '@/lib/format';
+import { callFunction } from '@/lib/functions';
 
 export type FormState = { error?: string; message?: string } | undefined;
 
@@ -53,17 +54,80 @@ export async function setPassword(_: FormState, form: FormData): Promise<FormSta
 // ───────────── scraping ─────────────
 export async function rerun(): Promise<FormState> {
   await teamClient();
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/scrape-start`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-function-secret': process.env.FUNCTION_SECRET! },
-    body: JSON.stringify({ trigger: 'manual' }),
-    cache: 'no-store',
-  });
-  const body = await res.json().catch(() => ({}));
+  const { res, body } = await callFunction('scrape-start', { trigger: 'manual' });
   if (res.status === 409) return { error: 'A scrape is already running. Check back in a few minutes.' };
   if (!res.ok) return { error: body.error ?? `Couldn't start the scrape (${res.status}).` };
   revalidatePath('/', 'layout');
   return { message: `Scraping ${body.profiles} profiles. Numbers update when it finishes.` };
+}
+
+export async function rerunStudent(_: FormState, form: FormData): Promise<FormState> {
+  await teamClient();
+  const { res, body } = await callFunction('scrape-start', {
+    trigger: 'manual', student_id: String(form.get('student_id')),
+  });
+  if (res.status === 409) return { error: 'A scrape is already running. Try again in a few minutes.' };
+  if (!res.ok) return { error: body.error ?? `Couldn't start the scrape (${res.status}).` };
+  revalidatePath('/', 'layout');
+  return { message: 'Re-scraping this profile. Refresh in a minute or two.' };
+}
+
+// ───────────── manual corrections ─────────────
+const SHORTCODE = /instagram\.com\/(?:[\w.]+\/)?(?:p|reel|reels|tv)\/([\w-]+)/i;
+
+export async function addPost(_: FormState, form: FormData): Promise<FormState> {
+  const { db } = await teamClient();
+  const student_id = String(form.get('student_id'));
+  const url = String(form.get('url') ?? '').trim();
+  const shortcode = url.match(SHORTCODE)?.[1];
+  const when = String(form.get('posted_at') ?? '');
+  const post_type = String(form.get('post_type') ?? 'image');
+  if (!shortcode) return { error: 'Paste the post’s Instagram link (…/p/… or …/reel/…).' };
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when)) return { error: 'Pick the date and time it was posted.' };
+  if (!['image', 'carousel', 'reel', 'video'].includes(post_type)) return { error: 'Unknown post type.' };
+
+  const { error } = await db.from('posts').insert({
+    student_id, shortcode, post_type, url: `https://www.instagram.com/p/${shortcode}/`,
+    posted_at: `${when}:00+05:30`, source: 'manual',
+  });
+  if (error) return { error: error.code === '23505' ? 'That post is already on record.' : error.message };
+  await db.rpc('refresh_metrics');
+  revalidatePath('/', 'layout');
+  return { message: 'Post added and counted.' };
+}
+
+export async function setExcluded(_: FormState, form: FormData): Promise<FormState> {
+  const { db } = await teamClient();
+  const excluded = form.get('excluded') === 'true';
+  const reason = String(form.get('reason') ?? '').trim();
+  if (excluded && !reason) return { error: 'Say why it shouldn’t count.' };
+  const { error } = await db.from('posts')
+    .update({ excluded, excluded_reason: excluded ? reason : null })
+    .eq('id', Number(form.get('post_id')));
+  if (error) return { error: error.message };
+  await db.rpc('refresh_metrics');
+  revalidatePath('/', 'layout');
+  return { message: excluded ? 'Excluded. It no longer counts.' : 'Restored. It counts again.' };
+}
+
+// ───────────── notes ─────────────
+export async function addNote(_: FormState, form: FormData): Promise<FormState> {
+  const { db, user } = await teamClient();
+  const body = String(form.get('body') ?? '').trim();
+  const kind = String(form.get('kind') ?? 'note');
+  if (!body) return { error: 'Write something first.' };
+  const { error } = await db.from('student_notes').insert({
+    student_id: String(form.get('student_id')), kind, body, author: user.email,
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/students/${form.get('student_id')}`);
+  return { message: 'Saved.' };
+}
+
+export async function deleteNote(form: FormData) {
+  const { db } = await teamClient();
+  await db.from('student_notes').delete().eq('id', Number(form.get('note_id')));
+  revalidatePath(`/students/${form.get('student_id')}`);
 }
 
 // ───────────── roster ─────────────
@@ -165,11 +229,20 @@ export async function saveSettings(_: FormState, form: FormData): Promise<FormSt
   // A trigger on settings moves the pg_cron job to the new time.
   const scrape_cron = istToCron(Number(form.get('scrape_day')), String(form.get('scrape_time') ?? ''));
   if (!scrape_cron) return { error: 'Pick a scrape day and time.' };
+  const quiet_days = Number(form.get('quiet_days'));
+  const challenge_weeks = Number(form.get('challenge_weeks'));
+  if (!Number.isInteger(quiet_days) || quiet_days < 1) return { error: 'Quiet days must be 1 or more.' };
+  if (!Number.isInteger(challenge_weeks) || challenge_weeks < 1) return { error: 'Challenge length must be 1 week or more.' };
+  const alert_emails = String(form.get('alert_emails') ?? '').split(/[,\s]+/).filter(Boolean);
+  if (alert_emails.some((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))) {
+    return { error: 'One of the alert emails doesn’t look right.' };
+  }
 
   const { error } = await db.from('settings').update({
     streak_threshold: threshold,
     milestones: [...new Set(milestones)].sort((a, b) => a - b),
-    sheet_id, scrape_cron, updated_at: new Date().toISOString(),
+    sheet_id, scrape_cron, quiet_days, challenge_weeks, alert_emails,
+    updated_at: new Date().toISOString(),
   }).eq('id', 1);
   if (error) return { error: error.message };
   revalidatePath('/', 'layout');

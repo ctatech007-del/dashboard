@@ -23,12 +23,16 @@ changing anything.
   re-run button, CSV export, settings.
 - **Google Sheet sync** after every run: tabs Leaderboard, Weekly, Milestones, Flags
   (read-only output; overwritten each run).
+- **Team tools** (added Oct 2026): Attention list (data problems + gone quiet / lost streak /
+  behind pace, thresholds in settings), per-student re-scrape, manual corrections (add a missed
+  post, exclude one with a reason; `posts.excluded` never counts), audit trail written by
+  triggers (`audit_log`), Runs & health page, failure alert emails (Resend, optional),
+  month-by-month view per student and per batch, notes / contact log per student.
 
 ## Out of scope (Phase 2 / change request — see brief dated Oct 2026)
 
 Student-facing hub (public leaderboards, search, 100 Post page, Passport + stamps), daily
-scraping, follower tracking, reel views, Heartbeat, contact log, contract data, frozen months,
-charts. The schema leaves room for these (`students.ig_user_id`, `posts.raw`) but none are built.
+scraping, follower tracking, reel views, Heartbeat, contract data, frozen months, charts. The schema leaves room for these (`students.ig_user_id`, `posts.raw`) but none are built.
 
 ## Stack
 
