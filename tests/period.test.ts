@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addMonths, average, boardValue, buckets, daysBetween, followersOn, istToday, monthEnd, monthList,
-  monthWindow, move, pctChange, rank,
+  monthWindow, move, pctChange, rank, resetCountdown,
 } from '../src/lib/period.ts';
 
 test('IST today: 23:30 UTC is already the next day in India', () => {
@@ -68,4 +68,10 @@ test('rank move: up is positive, new entries have no move', () => {
   assert.equal(move(3, 5), 2);
   assert.equal(move(5, 3), -2);
   assert.equal(move(1, undefined), null);
+});
+
+test('monthly reset countdown: days, then hours on the last day (IST)', () => {
+  assert.equal(resetCountdown(new Date('2026-10-13T06:00:00+05:30')), '19 days left');
+  assert.equal(resetCountdown(new Date('2026-10-31T06:00:00+05:30')), '18 hours left');
+  assert.equal(resetCountdown(new Date('2026-10-31T23:30:00+05:30')), '1 hour left');
 });

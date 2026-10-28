@@ -105,3 +105,13 @@ export function boardValue(
 /** Rank change since yesterday: positive = moved up. null when they weren't ranked yesterday. */
 export const move = (today: number, yesterday: number | undefined) =>
   yesterday === undefined ? null : yesterday - today;
+
+/** "18 days left" until the monthly reset (IST), switching to hours on the last day. */
+export function resetCountdown(now = new Date()) {
+  const today = istToday(now);
+  const reset = Date.parse(`${addDays(monthEnd(monthStart(today)), 1)}T00:00:00+05:30`);
+  const hours = Math.max(0, Math.ceil((reset - now.getTime()) / 3600_000));
+  if (hours <= 24) return `${hours} hour${hours === 1 ? '' : 's'} left`;
+  const days = daysBetween(today, monthEnd(monthStart(today))) + 1;
+  return `${days} days left`;
+}

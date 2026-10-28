@@ -23,7 +23,7 @@ Internal dashboard that tracks Creator Takeoff Academy students' Instagram posti
      and a sender on a domain verified in Resend, e.g. `CTA Tracker <alerts@creatortakeoff.com>`.
      Then add the recipients in the app under **Settings → Alert emails**.
 5. Deploy functions:
-   `supabase functions deploy scrape-start scrape-ingest sheets-sync health --no-verify-jwt`
+   `supabase functions deploy scrape-start scrape-ingest sheets-sync health rename-verify --no-verify-jwt`
    (they authenticate with `FUNCTION_SECRET` instead of a Supabase JWT).
 6. Schedule: save the `FUNCTION_SECRET` in Vault as `function_secret`, then run:
 
@@ -41,6 +41,11 @@ $$);
 
 `30 0 * * *` = 00:30 UTC = **06:00 IST every day**. (The job keeps its original name; the time can
 be changed later under Settings → Daily scrape.)
+
+### Student Hub
+The public Hub lives at `/hub` on the same deployment (no login): share that one link on Heartbeat.
+Students open their page by typing their exact handle; `/hub/<handle>` can be bookmarked. It reads
+only through the `hub_*` database functions, never the tables.
 
 ### 2. Google Sheet (optional)
 Create a Google Cloud service account with the Sheets API enabled, download its JSON key, share

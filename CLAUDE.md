@@ -5,8 +5,11 @@ posting for the 100 Post Challenge. This file is the source of truth for scope. 
 changing anything.
 
 **The brief changed in October 2026** (docs/brief-2026-10.md: written briefing + Loom notes).
-It is being built in phases: 1 daily data foundation (done) · 2 Student Stats rebuild ·
-3 Student Hub (public: leaderboards, 100 Posts, Passport) · 4 Heartbeat (blocked on data access).
+It is being built in phases: 1 daily data foundation (done) · 2 Student Stats rebuild (done) ·
+3 Student Hub at /hub (public: leaderboards, 100 Posts, Passport, handle-change form) · 4 Heartbeat
+(blocked on data access). Hub rules: exact-handle lookup only, active students only, reads via
+`hub_*` SECURITY DEFINER functions; stamps (`stamps`) and rewards (`rewards`) are awarded once by
+`daily_rollup()` and never removed; stamp names/texts live in src/lib/stamps.ts.
 Where the sections below disagree with that brief, the brief wins.
 
 ## Agreed scope (₹45K build — do NOT expand without a change request)

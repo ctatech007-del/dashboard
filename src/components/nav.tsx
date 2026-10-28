@@ -9,6 +9,7 @@ const MAIN = [
   { href: '/attention', label: 'Needs attention', match: (p: string) => p.startsWith('/attention'), badge: true },
   { href: '/leaderboard', label: 'Leaderboard', match: (p: string) => p.startsWith('/leaderboard') },
   { href: '/viral', label: 'Viral Reels', match: (p: string) => p.startsWith('/viral') },
+  { href: '/rewards', label: 'Rewards', match: (p: string) => p.startsWith('/rewards') },
 ];
 const TOOLS = [
   { href: '/troubleshooting', label: 'Troubleshooting', match: (p: string) => p.startsWith('/troubleshooting') },
@@ -43,6 +44,8 @@ export function NavLinks({ attention }: { attention: number }) {
       {MAIN.map(item)}
       <hr className="hidden md:block border-rule my-3" />
       {TOOLS.map(item)}
+      <a href="/hub" target="_blank" rel="noreferrer"
+        className="rounded-lg px-3 py-2 text-sm font-bold whitespace-nowrap text-brand hover:bg-paper">Student Hub ↗</a>
     </nav>
   );
 }

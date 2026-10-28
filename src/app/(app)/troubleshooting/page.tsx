@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { teamClient } from '@/lib/supabase';
 import { callFunction } from '@/lib/functions';
 import { cronToIst, OUTCOME_LABEL, relative } from '@/lib/format';
-import { rerun, rerunStudent } from '@/app/actions';
+import { rerun, rerunStudent, resolveRename } from '@/app/actions';
 import { ActionForm, RerunButton } from '@/components/forms';
 import { PageTitle } from '@/components/ui';
 
@@ -39,6 +39,9 @@ export default async function Troubleshooting() {
     callFunction('health').then((r) => (r.res.ok ? (r.body as Health) : {})).catch(() => ({} as Health)),
     db.from('open_flags').select('*').order('days_without_data', { ascending: false, nullsFirst: true }),
   ]);
+  const { data: renames } = await db.from('rename_requests')
+    .select('id, old_handle, new_handle, status, detail, created_at, student_id')
+    .in('status', ['needs_review', 'checking']).order('created_at', { ascending: false });
 
   const schedule = cronToIst(cfg?.scrape_cron ?? '');
   const stuck = (runs ?? []).find((r) => ['running', 'ingesting'].includes(r.status)
@@ -105,6 +108,31 @@ export default async function Troubleshooting() {
           ))}
         </ul>
       ) : <p className="card p-4 mb-10 text-sm">✓ Every active student was read in the last scrape.</p>}
+
+      {!!renames?.length && (
+        <>
+          <h2 className="display text-2xl mb-1">Handle changes from students ({renames.length})</h2>
+          <p className="text-sm text-ink-soft mb-3">Reported on the Hub. Same Instagram account → updated automatically; these need a look.</p>
+          <ul className="space-y-2 mb-10">
+            {renames.map((r) => (
+              <li key={r.id} className="card p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm">
+                  <Link href={`/students/${r.student_id}`} className="font-extrabold hover:underline">@{r.old_handle}</Link>
+                  {' → '}<a href={`https://instagram.com/${r.new_handle}`} target="_blank" rel="noreferrer" className="font-extrabold text-brand hover:underline">@{r.new_handle} ↗</a>
+                  <span className="block text-xs text-ink-soft">
+                    {r.status === 'checking' ? 'Still checking on Instagram…' : r.detail} · {relative(r.created_at)}
+                  </span>
+                </div>
+                <form action={resolveRename} className="flex gap-2">
+                  <input type="hidden" name="id" value={r.id} />
+                  <button name="decision" value="approve" className="btn !py-1.5 text-xs">Approve</button>
+                  <button name="decision" value="reject" className="btn btn-quiet !py-1.5 text-xs">Reject</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h2 className="display text-2xl mb-3">Health</h2>
       <ul className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-10">

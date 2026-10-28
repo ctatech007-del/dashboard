@@ -23,7 +23,8 @@ before(async () => {
   // Freeze now() for the metrics function.
   await db.exec(`create schema fake; create function fake.now() returns timestamptz
     language sql as $$ select '${NOW}'::timestamptz $$; set search_path = fake, public, pg_catalog;`);
-  for (const fn of ['recompute_metrics()', 'record_views(date, jsonb)', 'freeze_months()', 'daily_rollup()']) {
+  for (const fn of ['recompute_metrics()', 'record_views(date, jsonb)', 'freeze_months()', 'daily_rollup()',
+    'award_stamps()', 'hub_student(text)']) {
     await db.exec(`alter function ${fn} set search_path = fake, public, pg_catalog;`);
   }
 });
@@ -190,7 +191,8 @@ test('monthly counts follow IST calendar months and skip excluded posts', async 
 test('functions called through the Supabase API never DELETE without a WHERE (pg-safeupdate)', async () => {
   const { rows } = await db.query(`select proname, prosrc from pg_proc
     where proname in ('recompute_metrics', 'refresh_metrics', 'audit', 'sync_scrape_schedule',
-      'record_views', 'freeze_months', 'snapshot_rankings', 'daily_rollup')`);
+      'record_views', 'freeze_months', 'snapshot_rankings', 'daily_rollup', 'award_stamps', 'record_rewards',
+      'hub_request_rename')`);
   for (const r of rows) {
     assert.doesNotMatch(r.prosrc, /delete\s+from\s+[\w.]+\s*;/i, `${r.proname} has an unguarded DELETE`);
   }
@@ -288,4 +290,118 @@ test('daily rollup marks a post on two students\' grids as a collab', async () =
   await db.exec(`select daily_rollup()`);
   const { rows } = await db.query(`select is_collab from posts where shortcode = 'collab1'`);
   assert.deepEqual(rows.map((r) => r.is_collab), [true, true]);
+});
+
+// ───────────── Phase 3: Hub, stamps, rewards ─────────────
+const stampsOf = async (sid) => (await db.query(
+  `select stamp, earned_month::text m from stamps where student_id = $1 order by stamp`, [sid])).rows;
+
+test('rewards are recorded at the post that reaches each step, once, and survive corrections', async () => {
+  const s = await student('RW', 'reward_kid', 'Hub', '2026-11-01');
+  for (let i = 1; i <= 16; i++) await post(s, `rw${i}`, `2026-11-${String(i).padStart(2, '0')} 09:00`);
+  await db.exec(`select record_rewards()`);
+  await db.exec(`select record_rewards()`);
+  const { rows } = await db.query(`select step, (reached_at at time zone 'Asia/Kolkata')::date::text d
+    from rewards where student_id = $1 order by step`, [s]);
+  assert.deepEqual(rows, [{ step: 10, d: '2026-11-10' }, { step: 15, d: '2026-11-15' }]);
+  await db.query(`update posts set excluded = true where shortcode in ('rw1', 'rw2')`);
+  await db.exec(`select record_rewards()`);
+  assert.equal((await one(`select count(*)::int n from rewards where student_id = $1`, [s])).n, 2);
+});
+
+test('stamps: each family is earned once with its month, and never taken away', async () => {
+  const s = await student('Stamp Star', 'stamp_star', 'Hub', '2026-05-01');
+  await followers(s, '2026-11-01', 1000);
+  await followers(s, '2026-11-20', 1250);
+  for (let i = 1; i <= 15; i++) await post(s, `ss${i}`, `2026-11-${String(i).padStart(2, '0')} 10:00`);
+  await db.query(`update posts set is_collab = true where shortcode = 'ss3'`);
+  await db.query(`update posts set final_views = 12000, views_final_at = $1 where shortcode = 'ss2'`, [ist('2026-11-09 10:00')]);
+  await db.query(`insert into ranking_snapshots (day, board, item, rank, student_id, value)
+    values ('2026-11-18', 'total_posts', $1, 1, $2, 14)`, [s, s]);
+  await db.exec(`select award_stamps()`);
+  assert.deepEqual(await stampsOf(s), [
+    { stamp: 'boarding_pass', m: '2026-11-01' },
+    { stamp: 'captain', m: '2026-11-01' },
+    { stamp: 'co_pilot', m: '2026-11-01' },
+    { stamp: 'economy_premium', m: '2026-11-01' },
+    { stamp: 'first_captain', m: '2026-11-01' },
+    { stamp: 'hidden_gem', m: '2026-11-01' },
+    { stamp: 'jet_setter', m: '2026-11-01' },
+    { stamp: 'silver_wings', m: '2026-11-01' },
+    { stamp: 'takeoff', m: '2026-05-01' },
+    { stamp: 'wanderer', m: '2026-11-01' },
+  ]);
+  // Followers drop and posts get excluded: stamps stay
+  await db.query(`update follower_snapshots set followers = 500 where student_id = $1`, [s]);
+  await db.query(`update posts set excluded = true where student_id = $1`, [s]);
+  await db.exec(`select award_stamps()`);
+  assert.equal((await stampsOf(s)).length, 10);
+});
+
+test('frequent flyer needs 10+ posts in three consecutive months', async () => {
+  const s = await student('FF', 'freq_flyer', 'Hub', '2026-08-01');
+  for (const [m, n] of [['08', 10], ['09', 12], ['10', 9], ['11', 10]]) {
+    for (let i = 1; i <= n; i++) await post(s, `ff${m}${i}`, `2026-${m}-${String(i).padStart(2, '0')} 10:00`);
+  }
+  await db.exec(`select award_stamps()`);
+  assert.ok(!(await stampsOf(s)).some((x) => x.stamp === 'frequent_flyer'));
+  for (let i = 10; i <= 11; i++) await post(s, `ff10x${i}`, `2026-10-${i} 12:00`);
+  await db.exec(`select award_stamps()`);
+  assert.deepEqual((await stampsOf(s)).find((x) => x.stamp === 'frequent_flyer'), { stamp: 'frequent_flyer', m: '2026-10-01' });
+});
+
+test('hub lookup: exact current or old handle only; students who left are hidden', async () => {
+  const s = await student('Look', 'look_up', 'Hub', '2026-10-01');
+  await db.query(`insert into handle_history (student_id, old_handle, new_handle, detected_by)
+    values ($1, 'old_look', 'look_up', 'team')`, [s]);
+  const find = async (h) => (await one(`select hub_lookup($1) h`, [h])).h;
+  assert.equal(await find('@Look_Up'), 'look_up');
+  assert.equal(await find('old_look'), 'look_up');
+  assert.equal(await find('look'), null);
+  const hub = (await one(`select hub_student('old_look') j`)).j;
+  assert.equal(hub.handle, 'look_up');
+  assert.equal(hub.name, 'Look');
+  await db.query(`update students set status = 'left' where id = $1`, [s]);
+  assert.equal(await find('look_up'), null);
+});
+
+test('hub boards: growth top 3 with rank change, viral NEW tag, ties with +N', async () => {
+  const ids = [];
+  for (const h of ['bd_a', 'bd_b', 'bd_c', 'bd_d', 'bd_e', 'bd_f', 'bd_g']) ids.push(await student(h, h, 'Board', '2026-10-01'));
+  await db.exec(`delete from ranking_snapshots where true`);
+  const snap = (day, board, i, rank, value, reached, post_id = null) => db.query(
+    `insert into ranking_snapshots (day, board, item, rank, student_id, post_id, value, reached_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [day, board, post_id ? String(post_id) : ids[i], rank, ids[i], post_id, value, reached]);
+  // yesterday: a #1, b #2; today: b #1, a #2, c #3
+  await snap('2026-11-24', 'follower_growth', 0, 1, 500); await snap('2026-11-24', 'follower_growth', 1, 2, 400);
+  await snap('2026-11-25', 'follower_growth', 1, 1, 900); await snap('2026-11-25', 'follower_growth', 0, 2, 600);
+  await snap('2026-11-25', 'follower_growth', 2, 3, 100);
+  // posts: a 20, then b..g tied on 15 (b reached first)
+  await snap('2026-11-25', 'total_posts', 0, 1, 20, ist('2026-11-20 10:00'));
+  for (let i = 1; i <= 6; i++) await snap('2026-11-25', 'total_posts', i, 2, 15, ist(`2026-11-2${i} 0${i}:00`));
+  const { rows: [vp] } = await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url)
+    values ($1, 'bd_viral', 'reel', $2, 'https://www.instagram.com/p/bd_viral/') returning id`, [ids[3], ist('2026-11-23 10:00')]);
+  await snap('2026-11-25', 'viral', 3, 1, 50000, ist('2026-11-23 10:00'), vp.id);
+
+  const b = (await one(`select hub_boards() j`)).j;
+  assert.equal(b.day, '2026-11-25');
+  assert.deepEqual(b.follower_growth.map((g) => [g.ig_handle, g.rank, g.prev_rank]),
+    [['bd_b', 1, 2], ['bd_a', 2, 1], ['bd_c', 3, null]]);
+  assert.deepEqual(b.total_posts.map((t) => [t.ig_handle, t.rank]),
+    [['bd_a', 1], ['bd_b', 2], ['bd_c', 2], ['bd_d', 2], ['bd_e', 2]]);
+  assert.deepEqual(b.total_posts_tied, ['bd_f', 'bd_g']);
+  assert.deepEqual(b.viral.map((v) => [v.ig_handle, v.is_new, v.url]), [['bd_d', true, 'https://www.instagram.com/p/bd_viral/']]);
+});
+
+test('handle change requests: validated, matched to the student, one at a time', async () => {
+  await student('Ren', 'ren_old', 'Hub', '2026-10-01');
+  const req = async (a, b) => (await one(`select hub_request_rename($1, $2) j`, [a, b])).j;
+  assert.match((await req('ren_old', 'bad handle!')).error, /Instagram handle/);
+  assert.match((await req('nobody_here', 'ren_new')).error, /couldn’t find/);
+  const first = await req('@ren_old', '@Ren_New');
+  assert.equal(first.status, 'checking');
+  assert.equal((await req('ren_old', 'ren_new2')).id, first.id);
+  const r = await one(`select old_handle, new_handle from rename_requests where id = $1`, [first.id]);
+  assert.deepEqual(r, { old_handle: 'ren_old', new_handle: 'ren_new' });
 });

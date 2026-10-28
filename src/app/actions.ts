@@ -283,3 +283,37 @@ export async function saveSettings(_: FormState, form: FormData): Promise<FormSt
   revalidatePath('/', 'layout');
   return { message: 'Saved. New rules apply from the next scrape or re-run.' };
 }
+
+// ───────────── 100 Post rewards ─────────────
+export async function markRewardSent(form: FormData) {
+  const { db, user } = await teamClient();
+  const sent = form.get('undo') !== '1';
+  await db.from('rewards').update({
+    sent_at: sent ? new Date().toISOString() : null, sent_by: sent ? user.email : null,
+    note: String(form.get('note') ?? '').trim() || null,
+  }).eq('student_id', String(form.get('student_id'))).eq('step', Number(form.get('step')));
+  revalidatePath('/rewards');
+}
+
+// ───────────── handle changes reported on the Hub ─────────────
+export async function resolveRename(form: FormData) {
+  const { db, user } = await teamClient();
+  const id = String(form.get('id'));
+  const approve = form.get('decision') === 'approve';
+  const { data: r } = await db.from('rename_requests')
+    .select('id, student_id, new_handle, status, students(ig_handle)').eq('id', id).single();
+  if (!r || !['needs_review', 'checking'].includes(r.status)) return;
+  if (approve) {
+    const old = (r.students as unknown as { ig_handle: string }).ig_handle;
+    const { error } = await db.from('students')
+      .update({ ig_handle: r.new_handle, updated_at: new Date().toISOString() }).eq('id', r.student_id);
+    if (error) return;
+    await db.from('handle_history').insert({
+      student_id: r.student_id, old_handle: old, new_handle: r.new_handle, detected_by: 'team',
+    });
+  }
+  await db.from('rename_requests').update({
+    status: approve ? 'approved' : 'rejected', resolved_at: new Date().toISOString(), resolved_by: user.email,
+  }).eq('id', id);
+  revalidatePath('/troubleshooting');
+}
