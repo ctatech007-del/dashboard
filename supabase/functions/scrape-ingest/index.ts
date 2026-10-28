@@ -69,6 +69,7 @@ async function ingestProfiles(runId: string, resource: { defaultDatasetId: strin
 
   const items = await datasetItems<RawProfile>(resource.defaultDatasetId);
   const results: ResultRow[] = [];
+  const snapshots: Record<string, unknown>[] = [];
   const overflow: Student[] = [];
 
   for (const item of items) {
@@ -92,6 +93,10 @@ async function ingestProfiles(runId: string, resource: { defaultDatasetId: strin
 
     let added = 0;
     if (parsed.outcome === 'ok') {
+      if (parsed.followers !== null) {
+        snapshots.push({ student_id: student.id, day: today(), followers: parsed.followers,
+          following: parsed.following, posts_count: parsed.postsCount, run_id: runId });
+      }
       added = await savePosts(student.id, parsed.posts, runId);
       if (parsed.mayOverflow) overflow.push(student);
     }
@@ -105,6 +110,11 @@ async function ingestProfiles(runId: string, resource: { defaultDatasetId: strin
       detail: 'No profile returned: renamed, deleted or blocked' });
   }
   await writeResults(runId, results);
+  if (snapshots.length) {
+    const { error } = await db.from('follower_snapshots')
+      .upsert(snapshots, { onConflict: 'student_id,day' });
+    if (error) throw error;
+  }
 
   if (overflow.length) {
     const oldest = overflow
@@ -128,7 +138,7 @@ async function ingestOverflow(runId: string, datasetId: string) {
   const grouped = new Map<string, NormalizedPost[]>();
   for (const item of items) {
     const s = byHandle.get(cleanHandle(item.ownerUsername ?? ''));
-    const post = normalizePost(item);
+    const post = normalizePost(item, s ? cleanHandle(s.ig_handle) : undefined);
     if (!s || !post) continue;
     grouped.set(s.id, [...(grouped.get(s.id) ?? []), post]);
   }
@@ -150,7 +160,20 @@ async function savePosts(studentId: string, posts: NormalizedPost[], runId: stri
       { onConflict: 'student_id,shortcode', ignoreDuplicates: true })
     .select('id');
   if (error) throw error;
+
+  // Today's view count for every Reel/video we saw, new or not (final after day 7).
+  const views = posts.filter((p) => p.views !== null)
+    .map((p) => ({ student_id: studentId, shortcode: p.shortcode, views: p.views }));
+  if (views.length) {
+    const { error: viewsError } = await db.rpc('record_views', { d: today(), items: views });
+    if (viewsError) throw viewsError;
+  }
   return data?.length ?? 0;
+}
+
+/** Today's date in IST: daily rows (followers, views, rankings) are keyed by it. */
+function today(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
 interface ResultRow {
@@ -167,6 +190,9 @@ async function writeResults(runId: string, rows: ResultRow[]) {
 async function finalize(runId: string, warning: string | null) {
   const { error } = await db.rpc('recompute_metrics');
   if (error) throw error;
+  // Daily leaderboard snapshot, final Reel views, collabs and month freezing.
+  const { error: rollupError } = await db.rpc('daily_rollup');
+  if (rollupError) throw rollupError;
 
   const { count } = await db.from('scrape_results').select('*', { count: 'exact', head: true })
     .eq('run_id', runId).eq('outcome', 'ok');

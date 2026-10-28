@@ -137,16 +137,42 @@ async function batchId(db: Awaited<ReturnType<typeof supabase>>, name: string) {
   return data?.id as string | undefined;
 }
 
+/** Optional master data shared by the add and edit forms. Blank contract end = start + length. */
+function masterData(form: FormData): { error: string } | { data: Record<string, unknown> } {
+  const text = (k: string) => String(form.get(k) ?? '').trim();
+  const heartbeat_url = text('heartbeat_url') || null;
+  if (heartbeat_url && !/^https:\/\/\S+$/.test(heartbeat_url)) return { error: 'The Heartbeat link should start with https://' };
+  const months = text('contract_months');
+  const contract_months = months ? Number(months) : null;
+  if (contract_months !== null && (!Number.isInteger(contract_months) || contract_months < 1 || contract_months > 60)) {
+    return { error: 'Contract length is a number of months, e.g. 6 or 12.' };
+  }
+  const contract_end = text('contract_end') || null;
+  const leave = text('leave_date') || null;
+  const intake = text('intake_month');
+  if ([contract_end, leave].some((d) => d && !isDate(d)) || (intake && !/^\d{4}-\d{2}$/.test(intake))) {
+    return { error: 'One of the dates isn’t valid.' };
+  }
+  const data: Record<string, unknown> = { heartbeat_url, contract_months, contract_end, leave_date: leave };
+  if (form.has('intake_month')) data.intake_month = intake ? `${intake}-01` : null;
+  return { data };
+}
+const todayIst = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
 export async function addStudent(_: FormState, form: FormData): Promise<FormState> {
   const { db } = await teamClient();
   const name = String(form.get('name') ?? '').trim();
   const handle = cleanHandle(String(form.get('handle') ?? ''));
   const batch = String(form.get('batch') ?? '').trim();
   const start = String(form.get('start_date') ?? '');
-  if (!name || !handle || !batch || !isDate(start)) return { error: 'Fill in name, handle, batch and start date.' };
+  if (!name || !handle || !batch || !isDate(start)) return { error: 'Fill in name, handle, batch and join date.' };
+  const extra = masterData(form);
+  if ('error' in extra) return extra;
 
   const batch_id = await batchId(db, batch);
-  const { error } = await db.from('students').insert({ name, ig_handle: handle, batch_id, start_date: start });
+  const { error } = await db.from('students').insert({
+    name, ig_handle: handle, batch_id, start_date: start, ...extra.data,
+  });
   if (error) return { error: error.code === '23505' ? `@${handle} is already on the roster.` : error.message };
   revalidatePath('/', 'layout');
   return { message: `Added ${name} (@${handle}).` };
@@ -161,13 +187,18 @@ export async function updateStudent(_: FormState, form: FormData): Promise<FormS
   const handle = cleanHandle(String(form.get('handle') ?? before.ig_handle));
   const start = String(form.get('start_date') ?? '');
   const status = String(form.get('status') ?? 'active');
-  if (!isDate(start)) return { error: 'Start date must be a valid date.' };
-  if (!['active', 'paused', 'removed'].includes(status)) return { error: 'Unknown status.' };
+  if (!isDate(start)) return { error: 'Join date must be a valid date.' };
+  if (!['active', 'paused', 'left', 'removed'].includes(status)) return { error: 'Unknown status.' };
+  const extra = masterData(form);
+  if ('error' in extra) return extra;
+  // Leaving: stop scraping from that day, keep all history.
+  if (status === 'left' && !extra.data.leave_date) extra.data.leave_date = todayIst();
+  if (status === 'active') extra.data.leave_date = null;
 
   const batch_id = await batchId(db, String(form.get('batch') ?? ''));
   const { error } = await db.from('students').update({
     name: String(form.get('name') ?? '').trim(), ig_handle: handle, batch_id,
-    start_date: start, status, updated_at: new Date().toISOString(),
+    start_date: start, status, ...extra.data, updated_at: new Date().toISOString(),
   }).eq('id', id);
   if (error) return { error: error.code === '23505' ? `@${handle} is already on the roster.` : error.message };
 
@@ -189,6 +220,8 @@ export async function uploadCsv(_: FormState, form: FormData): Promise<FormState
   const header = (rows.shift() ?? []).map((h) => h.toLowerCase().replace(/\s+/g, '_'));
   const col = (n: string) => header.indexOf(n);
   const [iName, iHandle, iBatch, iStart] = ['name', 'handle', 'batch', 'start_date'].map(col);
+  // Optional columns
+  const [iHeartbeat, iMonths, iEnd] = ['heartbeat_url', 'contract_months', 'contract_end'].map(col);
   if ([iName, iHandle, iBatch, iStart].includes(-1)) {
     return { error: 'The CSV needs these columns: name, handle, batch, start_date (YYYY-MM-DD).' };
   }
@@ -201,8 +234,14 @@ export async function uploadCsv(_: FormState, form: FormData): Promise<FormState
     const name = r[iName], handle = cleanHandle(r[iHandle] ?? ''), batch = r[iBatch], start = r[iStart];
     if (!name || !handle || !batch || !isDate(start ?? '')) { problems.push(`row ${line}: missing or invalid value`); continue; }
     if (!batches.has(batch)) batches.set(batch, (await batchId(db, batch))!);
+    const months = iMonths >= 0 && r[iMonths] ? Number(r[iMonths]) : null;
+    const end = iEnd >= 0 && r[iEnd] ? r[iEnd] : null;
+    if ((months !== null && !(Number.isInteger(months) && months > 0)) || (end && !isDate(end))) {
+      problems.push(`row ${line}: invalid contract`); continue;
+    }
     const { error } = await db.from('students').insert({
       name, ig_handle: handle, batch_id: batches.get(batch), start_date: start,
+      heartbeat_url: iHeartbeat >= 0 ? r[iHeartbeat] || null : null, contract_months: months, contract_end: end,
     });
     if (error) problems.push(`row ${line}: ${error.code === '23505' ? `@${handle} already on the roster` : error.message}`);
     else added++;
@@ -227,8 +266,8 @@ export async function saveSettings(_: FormState, form: FormData): Promise<FormSt
   const sheetRaw = String(form.get('sheet_id') ?? '').trim();
   const sheet_id = sheetRaw.match(/\/d\/([\w-]+)/)?.[1] ?? (sheetRaw || null);
   // A trigger on settings moves the pg_cron job to the new time.
-  const scrape_cron = istToCron(Number(form.get('scrape_day')), String(form.get('scrape_time') ?? ''));
-  if (!scrape_cron) return { error: 'Pick a scrape day and time.' };
+  const scrape_cron = istToCron(String(form.get('scrape_time') ?? ''));
+  if (!scrape_cron) return { error: 'Pick the time of the daily scrape.' };
   const quiet_days = Number(form.get('quiet_days'));
   const challenge_weeks = Number(form.get('challenge_weeks'));
   if (!Number.isInteger(quiet_days) || quiet_days < 1) return { error: 'Quiet days must be 1 or more.' };

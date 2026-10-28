@@ -23,7 +23,9 @@ before(async () => {
   // Freeze now() for the metrics function.
   await db.exec(`create schema fake; create function fake.now() returns timestamptz
     language sql as $$ select '${NOW}'::timestamptz $$; set search_path = fake, public, pg_catalog;`);
-  await db.exec(`alter function recompute_metrics() set search_path = fake, public, pg_catalog;`);
+  for (const fn of ['recompute_metrics()', 'record_views(date, jsonb)', 'freeze_months()', 'daily_rollup()']) {
+    await db.exec(`alter function ${fn} set search_path = fake, public, pg_catalog;`);
+  }
 });
 
 async function student(name, handle, batch, start) {
@@ -137,17 +139,19 @@ test('a collab post can count for two students', async () => {
   assert.equal((await metrics(b)).total_posts, 1);
 });
 
-test('saving a new scrape time moves the cron job; non-weekly schedules are refused', async () => {
+test('saving a new scrape time moves the cron job; only daily schedules are allowed', async () => {
   // Stand-in for pg_cron, which PGlite doesn't ship.
   await db.exec(`create schema cron;
     create table cron.job (jobid bigint, jobname text, schedule text);
-    insert into cron.job values (1, 'cta-weekly-scrape', '30 0 * * 1');
+    insert into cron.job values (1, 'cta-weekly-scrape', '30 0 * * *');
     create function cron.alter_job(job_id bigint, schedule text) returns void language sql as
       $$ update cron.job set schedule = alter_job.schedule where jobid = job_id $$;`);
-  await db.exec(`update settings set scrape_cron = '30 20 * * 0'`);
+  await db.exec(`update settings set scrape_cron = '0 2 * * *'`);
   const { rows } = await db.query(`select schedule from cron.job where jobid = 1`);
-  assert.equal(rows[0].schedule, '30 20 * * 0');
-  await assert.rejects(db.exec(`update settings set scrape_cron = '*/5 * * * *'`), /scrape_cron_weekly/);
+  assert.equal(rows[0].schedule, '0 2 * * *');
+  await assert.rejects(db.exec(`update settings set scrape_cron = '*/5 * * * *'`), /scrape_cron_daily/);
+  await assert.rejects(db.exec(`update settings set scrape_cron = '30 0 * * 1'`), /scrape_cron_daily/);
+  await db.exec(`update settings set scrape_cron = '30 0 * * *'`);
 });
 
 test('an excluded post stops counting; a manual post counts; both are in the audit log', async () => {
@@ -185,8 +189,103 @@ test('monthly counts follow IST calendar months and skip excluded posts', async 
 
 test('functions called through the Supabase API never DELETE without a WHERE (pg-safeupdate)', async () => {
   const { rows } = await db.query(`select proname, prosrc from pg_proc
-    where proname in ('recompute_metrics', 'refresh_metrics', 'audit', 'sync_scrape_schedule')`);
+    where proname in ('recompute_metrics', 'refresh_metrics', 'audit', 'sync_scrape_schedule',
+      'record_views', 'freeze_months', 'snapshot_rankings', 'daily_rollup')`);
   for (const r of rows) {
     assert.doesNotMatch(r.prosrc, /delete\s+from\s+[\w.]+\s*;/i, `${r.proname} has an unguarded DELETE`);
   }
+});
+
+// ───────────── Phase 1: daily data (docs/brief-2026-10.md) ─────────────
+async function followers(sid, day, n) {
+  await db.query(`insert into follower_snapshots (student_id, day, followers) values ($1, $2, $3)`, [sid, day, n]);
+}
+const one = async (sql, params) => (await db.query(sql, params)).rows[0];
+
+test('intake month rounds the join date to the nearest kickoff; contract end follows its length', async () => {
+  const late = await student('K1', 'kick30', 'Kick', '2026-10-30');
+  const early = await student('K2', 'kick02', 'Kick', '2026-11-02');
+  const mid = await student('K3', 'kick20', 'Kick', '2026-11-20');
+  const intake = async (id) => (await one(`select intake_month::text m from students where id = $1`, [id])).m;
+  assert.equal(await intake(late), '2026-11-01');
+  assert.equal(await intake(early), '2026-11-01');
+  assert.equal(await intake(mid), '2026-12-01');
+  await db.query(`update students set contract_months = 6 where id = $1`, [early]);
+  assert.equal((await one(`select contract_end::text e from students where id = $1`, [early])).e, '2027-05-02');
+});
+
+test('reel views: updated daily, final on day 7, never changed after', async () => {
+  const s = await student('V', 'vvv', 'Views', '2026-11-01');
+  await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url)
+    values ($1, 'fresh', 'reel', $2, 'u'), ($1, 'aged', 'reel', $3, 'u')`,
+    [s, ist('2026-11-22 10:00'), ist('2026-11-15 10:00')]);
+  const rec = (d, sc, v) => db.query(`select record_views($1, $2)`,
+    [d, JSON.stringify([{ student_id: s, shortcode: sc, views: v }])]);
+  await rec('2026-11-23', 'fresh', 100);
+  await rec('2026-11-25', 'fresh', 500);
+  await rec('2026-11-25', 'aged', 900);
+  await rec('2026-11-26', 'aged', 1000);   // already final: ignored
+  const p = async (sc) => one(`select views, final_views from posts where shortcode = $1`, [sc]);
+  assert.deepEqual(await p('fresh'), { views: 500, final_views: null });
+  assert.deepEqual(await p('aged'), { views: 900, final_views: 900 });
+  const { rows } = await db.query(`select pv.day::text, pv.views from post_views pv join posts p on p.id = pv.post_id
+    where p.shortcode = 'fresh' order by day`);
+  assert.deepEqual(rows, [{ day: '2026-11-23', views: 100 }, { day: '2026-11-25', views: 500 }]);
+});
+
+test('finished months freeze once (after the 7-day view window) and never change', async () => {
+  const s = await student('M', 'mmm', 'Months', '2026-09-01');
+  await followers(s, '2026-09-01', 900);
+  await followers(s, '2026-09-30', 1000);
+  await followers(s, '2026-10-15', 1200);
+  await followers(s, '2026-10-31', 1500);
+  await post(s, 'sep1', '2026-09-10 10:00');
+  await post(s, 'sep2', '2026-09-30 23:00');
+
+  // Running month, up to a day: the same-days comparison uses this
+  const partial = await one(`select follower_growth from month_rows('2026-10-01', '2026-10-15') where student_id = $1`, [s]);
+  assert.equal(partial.follower_growth, 200);
+
+  await db.exec(`select freeze_months()`);   // now = 25 Nov: Sep and Oct are frozen (Oct on 8 Nov); Nov isn't
+  const sep = await one(`select posts, followers_start, followers_end, follower_growth, in_community
+    from month_stats where month = '2026-09-01' and student_id = $1`, [s]);
+  assert.deepEqual(sep, { posts: 2, followers_start: 900, followers_end: 1000, follower_growth: 100, in_community: true });
+  const oct = await one(`select follower_growth from month_stats where month = '2026-10-01' and student_id = $1`, [s]);
+  assert.equal(oct.follower_growth, 500);
+  assert.equal((await one(`select count(*)::int n from month_stats where month = '2026-11-01'`)).n, 0);
+
+  await post(s, 'sep3', '2026-09-15 10:00');   // a late change to a frozen month
+  await db.exec(`select freeze_months()`);
+  assert.equal((await one(`select posts from month_stats where month = '2026-09-01' and student_id = $1`, [s])).posts, 2);
+  assert.ok((await one(`select joined_count from community_months where month = '2026-09-01'`)).joined_count >= 1);
+});
+
+test('daily snapshots: follower growth, posts with tie order, viral last 7 days', async () => {
+  const a = await student('RA', 'rank_a', 'Rank', '2026-10-01');
+  const b = await student('RB', 'rank_b', 'Rank', '2026-10-01');
+  await followers(a, '2026-11-01', 100); await followers(a, '2026-11-25', 300);
+  await followers(b, '2026-11-01', 100); await followers(b, '2026-11-25', 150);
+  for (const [i, d] of ['03', '06', '10'].entries()) await post(a, `ra${i}`, `2026-11-${d} 10:00`);
+  for (const [i, d] of ['04', '08', '12'].entries()) await post(b, `rb${i}`, `2026-11-${d} 10:00`);
+  await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url, views)
+    values ($1, 'viral1', 'reel', $2, 'u', 5000)`, [a, ist('2026-11-22 10:00')]);
+
+  await db.exec(`select snapshot_rankings('2026-11-25')`);
+  const board = async (name, id) => one(`select rank, value from ranking_snapshots
+    where day = '2026-11-25' and board = $1 and student_id = $2 order by rank limit 1`, [name, id]);
+  assert.ok((await board('follower_growth', a)).rank < (await board('follower_growth', b)).rank);
+  assert.equal((await board('follower_growth', a)).value, 200);
+
+  const pa = await board('total_posts', a), pb = await board('total_posts', b);
+  assert.equal(pa.value, 4); assert.equal(pb.value, 3);   // a also has the reel
+
+  const v = await one(`select rank, value from ranking_snapshots where day = '2026-11-25' and board = 'viral' and item =
+    (select id::text from posts where shortcode = 'viral1')`);
+  assert.deepEqual(v, { rank: 1, value: 5000 });
+});
+
+test('daily rollup marks a post on two students\' grids as a collab', async () => {
+  await db.exec(`select daily_rollup()`);
+  const { rows } = await db.query(`select is_collab from posts where shortcode = 'collab1'`);
+  assert.deepEqual(rows.map((r) => r.is_collab), [true, true]);
 });

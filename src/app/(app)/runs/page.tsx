@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { teamClient } from '@/lib/supabase';
 import { callFunction } from '@/lib/functions';
-import { cronToIst, OUTCOME_LABEL, relative, WEEKDAYS } from '@/lib/format';
+import { cronToIst, OUTCOME_LABEL, relative } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,12 +36,13 @@ export default async function Runs() {
 
   const checks: { label: string; ok: boolean | null; detail: string }[] = [
     {
-      label: 'Last full scrape', ok: lastGood ? Date.now() - new Date(lastGood.finished_at).getTime() < 8 * 864e5 : false,
+      // Daily scrape: anything older than ~a day and a bit means a run was missed.
+      label: 'Last full scrape', ok: lastGood ? Date.now() - new Date(lastGood.finished_at).getTime() < 30 * 3600_000 : false,
       detail: lastGood ? relative(lastGood.finished_at) : 'never',
     },
     {
       label: 'Schedule', ok: !!schedule,
-      detail: schedule ? `${WEEKDAYS[schedule.dow]}s at ${schedule.time} IST` : 'not set',
+      detail: schedule ? `Every day at ${schedule} IST` : 'not set',
     },
     { label: 'Stuck runs', ok: !stuck, detail: stuck ? `one started ${relative(stuck.started_at)} hasn’t finished` : 'none' },
     {
@@ -92,7 +93,7 @@ export default async function Runs() {
                     <span className={`size-2.5 rounded-full ${r.status === 'done' && !r.error ? 'bg-green'
                       : r.status === 'failed' ? 'bg-pink' : r.status === 'done' ? 'bg-lime' : 'bg-blue'}`} aria-hidden />
                     <span className="font-semibold">
-                      {single ? `Re-scrape: ${single.name}` : r.trigger === 'schedule' ? 'Weekly scrape' : 'Manual re-run'}
+                      {single ? `Re-scrape: ${single.name}` : r.trigger === 'schedule' ? 'Daily scrape' : 'Manual re-run'}
                     </span>
                     <span className="text-sm text-ink-soft">{relative(r.started_at)}</span>
                   </span>

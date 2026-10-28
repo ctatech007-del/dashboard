@@ -1,12 +1,12 @@
 import { teamClient } from '@/lib/supabase';
 import { saveSettings } from '@/app/actions';
 import { ActionForm } from '@/components/forms';
-import { cronToIst, WEEKDAYS } from '@/lib/format';
+import { cronToIst } from '@/lib/format';
 
 export default async function Settings() {
   const { db } = await teamClient();
   const { data: cfg } = await db.from('settings').select('*').single();
-  const schedule = cronToIst(cfg?.scrape_cron ?? '') ?? { dow: 1, time: '06:00' };
+  const scrapeTime = cronToIst(cfg?.scrape_cron ?? '') ?? '06:00';
 
   return (
     <>
@@ -57,17 +57,12 @@ export default async function Settings() {
               <input name="alert_emails" defaultValue={(cfg?.alert_emails ?? []).join(', ')}
                 placeholder="you@creatortakeoff.com" className="field" />
             </label>
-            <fieldset className="text-sm">
-              <legend className="block font-semibold">Weekly scrape</legend>
-              <span className="block text-ink-soft mb-2">Day and time it runs, Indian time.</span>
-              <div className="flex gap-3">
-                <select name="scrape_day" defaultValue={schedule.dow} aria-label="Scrape day" className="field max-w-40">
-                  {WEEKDAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
-                </select>
-                <input name="scrape_time" type="time" required defaultValue={schedule.time}
-                  aria-label="Scrape time (IST)" className="field max-w-32" />
-              </div>
-            </fieldset>
+            <label className="block text-sm">
+              <span className="block font-semibold">Daily scrape</span>
+              <span className="block text-ink-soft mb-2">Time it runs every day, Indian time.</span>
+              <input name="scrape_time" type="time" required defaultValue={scrapeTime}
+                aria-label="Scrape time (IST)" className="field max-w-32" />
+            </label>
           </div>
         </ActionForm>
       </section>

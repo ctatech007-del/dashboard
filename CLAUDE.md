@@ -4,10 +4,22 @@ Internal, login-protected tool for Creator Takeoff Academy's team to track stude
 posting for the 100 Post Challenge. This file is the source of truth for scope. Read it before
 changing anything.
 
+**The brief changed in October 2026** (docs/brief-2026-10.md: written briefing + Loom notes).
+It is being built in phases: 1 daily data foundation (done) · 2 Student Stats rebuild ·
+3 Student Hub (public: leaderboards, 100 Posts, Passport) · 4 Heartbeat (blocked on data access).
+Where the sections below disagree with that brief, the brief wins.
+
 ## Agreed scope (₹45K build — do NOT expand without a change request)
 
-- Scrape each active student's **public** Instagram profile on a schedule (default: weekly,
-  Monday 06:00 IST; configurable in `settings.scrape_cron`).
+- Scrape each active student's **public** Instagram profile **daily at 06:00 IST**
+  (`settings.scrape_cron`, daily only). Students who left (`status = 'left'`) aren't scraped.
+- Daily data: `follower_snapshots` (followers per student per IST day), Reel/video views in
+  `post_views` for 7 days with `posts.final_views` fixed on day 7 (images/carousels have no public
+  views), `posts.is_collab`, and `ranking_snapshots` (full daily ranking per board). Finished
+  months are frozen into `month_stats` / `community_months` on the 8th of the next month and never
+  recomputed; `month_rows(m, upto)` gives the same numbers for a running or partial month.
+- Student master data: join date (`start_date`), `intake_month` (kickoff month, rounds the join
+  date to the nearest 1st, editable), Heartbeat link, contract length/end, leave date.
 - Count **feed posts only** (images, carousels, reels on the grid). Stories are never tracked.
   A carousel = 1 post. Posts counted from the student's `start_date`.
 - Per student: posts this week, running total since start, streak, milestones, batch rank.

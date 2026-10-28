@@ -28,7 +28,7 @@ Internal dashboard that tracks Creator Takeoff Academy students' Instagram posti
 6. Schedule: save the `FUNCTION_SECRET` in Vault as `function_secret`, then run:
 
 ```sql
-select cron.schedule('cta-weekly-scrape', '30 0 * * 1', $$
+select cron.schedule('cta-weekly-scrape', '30 0 * * *', $$
   select net.http_post(
     url := 'https://<project-ref>.supabase.co/functions/v1/scrape-start',
     headers := jsonb_build_object(
@@ -39,7 +39,8 @@ select cron.schedule('cta-weekly-scrape', '30 0 * * 1', $$
 $$);
 ```
 
-`30 0 * * 1` = Monday 00:30 UTC = **Monday 06:00 IST**.
+`30 0 * * *` = 00:30 UTC = **06:00 IST every day**. (The job keeps its original name; the time can
+be changed later under Settings → Daily scrape.)
 
 ### 2. Google Sheet (optional)
 Create a Google Cloud service account with the Sheets API enabled, download its JSON key, share

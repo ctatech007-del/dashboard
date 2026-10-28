@@ -17,6 +17,8 @@ export interface RawPost {
   ownerUsername?: string;
   ownerId?: string;
   isPinned?: boolean;
+  videoViewCount?: number;  // Reels/videos only: Instagram has no public views for images
+  videoPlayCount?: number;
 }
 
 export interface RawProfile {
@@ -25,6 +27,8 @@ export interface RawProfile {
   inputUrl?: string;
   private?: boolean;
   postsCount?: number;
+  followersCount?: number;
+  followsCount?: number;
   latestPosts?: RawPost[];
   error?: string;
   errorDescription?: string;
@@ -35,6 +39,8 @@ export interface NormalizedPost {
   post_type: PostType;
   posted_at: string;
   url: string;
+  views: number | null;
+  is_collab: boolean;
   raw: RawPost;
 }
 
@@ -46,6 +52,9 @@ export interface ProfileResult {
   posts: NormalizedPost[];
   // true when every returned post is newer than `since`: there may be more we didn't get
   mayOverflow: boolean;
+  followers: number | null;
+  following: number | null;
+  postsCount: number | null;
 }
 
 export const LATEST_POSTS_LIMIT = 12;
@@ -68,16 +77,22 @@ export function postType(p: RawPost): PostType | null {
   return null;
 }
 
-export function normalizePost(p: RawPost): NormalizedPost | null {
+const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.round(n) : null);
+
+/** `handle` is the student whose grid the post came from: a post owned by someone else is a collab. */
+export function normalizePost(p: RawPost, handle?: string): NormalizedPost | null {
   const type = postType(p);
   if (!type || !p.shortCode || !p.timestamp) return null;
   const posted = new Date(p.timestamp);
   if (Number.isNaN(posted.getTime())) return null;
+  const owner = p.ownerUsername ? cleanHandle(p.ownerUsername) : null;
   return {
     shortcode: p.shortCode,
     post_type: type,
     posted_at: posted.toISOString(),
     url: p.url ?? `https://www.instagram.com/p/${p.shortCode}/`,
+    views: type === 'reel' || type === 'video' ? count(p.videoViewCount ?? p.videoPlayCount) : null,
+    is_collab: !!(handle && owner && owner !== handle),
     raw: p,
   };
 }
@@ -94,16 +109,17 @@ export function parseProfile(item: RawProfile, since: Date | null): ProfileResul
       handle, igUserId: null,
       outcome: notFound ? 'not_found' : 'error',
       detail: item.errorDescription ?? item.error ?? null,
-      posts: [], mayOverflow: false,
+      posts: [], mayOverflow: false, followers: null, following: null, postsCount: null,
     };
   }
   if (item.private) {
     return { handle, igUserId: item.id ?? null, outcome: 'private',
-      detail: 'Account is private', posts: [], mayOverflow: false };
+      detail: 'Account is private', posts: [], mayOverflow: false,
+      followers: null, following: null, postsCount: null };
   }
 
   const posts = (item.latestPosts ?? [])
-    .map(normalizePost)
+    .map((p) => normalizePost(p, handle))
     .filter((p): p is NormalizedPost => p !== null);
 
   // Pinned posts can be old, so only unpinned posts decide whether we might have missed some.
@@ -112,7 +128,10 @@ export function parseProfile(item: RawProfile, since: Date | null): ProfileResul
     unpinned.length >= LATEST_POSTS_LIMIT - 3 &&
     unpinned.every((p) => p.timestamp && new Date(p.timestamp) > since);
 
-  return { handle, igUserId: item.id ?? null, outcome: 'ok', detail: null, posts, mayOverflow };
+  return {
+    handle, igUserId: item.id ?? null, outcome: 'ok', detail: null, posts, mayOverflow,
+    followers: count(item.followersCount), following: count(item.followsCount), postsCount: count(item.postsCount),
+  };
 }
 
 /** Profiles we asked for that came back with no item at all → not found. */

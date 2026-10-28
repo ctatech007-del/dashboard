@@ -21,29 +21,26 @@ export function weekLabel(weekStart: string): string {
   return d.toLocaleDateString('en-GB', { timeZone: TZ, day: 'numeric', month: 'short' });
 }
 
-// ───────────── weekly scrape schedule ─────────────
-// pg_cron runs in UTC; the team thinks in IST (UTC+5:30). Only weekly schedules are allowed
-// ("m h * * dow", dow 0 = Sunday), matching the settings.scrape_cron check constraint.
-export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// ───────────── daily scrape schedule ─────────────
+// pg_cron runs in UTC; the team thinks in IST (UTC+5:30). Only daily schedules are allowed
+// ("m h * * *"), matching the settings.scrape_cron check constraint.
 const IST_OFFSET = 330;
-const WEEK = 7 * 1440;
+const DAY = 1440;
 
-/** IST weekday (0 = Sunday) and "HH:MM" → weekly cron in UTC. */
-export function istToCron(dow: number, time: string): string | null {
+/** "HH:MM" IST → daily cron in UTC. */
+export function istToCron(time: string): string | null {
   const m = time.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
-  if (!m || !Number.isInteger(dow) || dow < 0 || dow > 6) return null;
-  const utc = (dow * 1440 + Number(m[1]) * 60 + Number(m[2]) - IST_OFFSET + WEEK) % WEEK;
-  return `${utc % 60} ${Math.floor(utc / 60) % 24} * * ${Math.floor(utc / 1440)}`;
+  if (!m) return null;
+  const utc = (Number(m[1]) * 60 + Number(m[2]) - IST_OFFSET + DAY) % DAY;
+  return `${utc % 60} ${Math.floor(utc / 60)} * * *`;
 }
 
-/** Weekly cron in UTC → IST weekday (0 = Sunday) and "HH:MM". */
-export function cronToIst(cron: string): { dow: number; time: string } | null {
-  const m = cron.trim().match(/^(\d{1,2}) (\d{1,2}) \* \* ([0-6])$/);
+/** Daily cron in UTC → "HH:MM" IST. */
+export function cronToIst(cron: string): string | null {
+  const m = cron.trim().match(/^(\d{1,2}) (\d{1,2}) \* \* \*$/);
   if (!m) return null;
-  const ist = (Number(m[3]) * 1440 + Number(m[2]) * 60 + Number(m[1]) + IST_OFFSET) % WEEK;
-  const hh = String(Math.floor(ist / 60) % 24).padStart(2, '0');
-  const mm = String(ist % 60).padStart(2, '0');
-  return { dow: Math.floor(ist / 1440), time: `${hh}:${mm}` };
+  const ist = (Number(m[2]) * 60 + Number(m[1]) + IST_OFFSET) % DAY;
+  return `${String(Math.floor(ist / 60)).padStart(2, '0')}:${String(ist % 60).padStart(2, '0')}`;
 }
 
 export const OUTCOME_LABEL: Record<string, string> = {

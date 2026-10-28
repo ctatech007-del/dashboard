@@ -39,3 +39,18 @@ test('overflow detection: full page of new unpinned posts', () => {
 test('missing handles become not_found', () => {
   assert.deepEqual(missingHandles(['Aaa', 'bbb'], [{ username: 'aaa' }]), ['bbb']);
 });
+
+test('followers, reel views and collabs come through; images have no views', () => {
+  const r = parseProfile({
+    username: 'Riya', followersCount: 1520, followsCount: 300, postsCount: 41,
+    latestPosts: [
+      { shortCode: 'r1', type: 'Video', productType: 'clips', timestamp: '2026-11-20T10:00:00Z', videoViewCount: 1962, ownerUsername: 'riya' },
+      { shortCode: 'c1', type: 'Sidecar', timestamp: '2026-11-19T10:00:00Z', ownerUsername: 'riya' },
+      { shortCode: 'x1', type: 'Image', timestamp: '2026-11-18T10:00:00Z', ownerUsername: 'someone_else' },
+    ],
+  }, null);
+  assert.deepEqual([r.followers, r.following, r.postsCount], [1520, 300, 41]);
+  assert.deepEqual(r.posts.map((p) => [p.shortcode, p.views, p.is_collab]),
+    [['r1', 1962, false], ['c1', null, false], ['x1', null, true]]);
+  assert.equal(parseProfile({ username: 'a', private: true }, null).followers, null);
+});
