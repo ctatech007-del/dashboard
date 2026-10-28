@@ -14,8 +14,8 @@ export default async function SetPassword() {
   return (
     <main className="min-h-screen grid place-items-center px-6">
       <div className="w-full max-w-sm">
-        <Star className="size-16 text-pink mb-6" />
-        <h1 className="wide text-3xl font-bold uppercase">Choose a password</h1>
+        <Star className="size-16 text-brand mb-6" />
+        <h1 className="display text-4xl">Choose a password</h1>
         <p className="text-ink-soft mt-1 mb-8">For {data.user.email}. At least 8 characters.</p>
         <ActionForm action={setPassword} submit="Save password">
           <div className="space-y-3">

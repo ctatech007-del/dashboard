@@ -1,26 +1,34 @@
 @import "tailwindcss";
 
-/* Dark base with neon accent cards. Text on a neon card is always --on-neon. */
+/* Warm paper and orange, from the client's prototype (docs/brief-2026-10.md). Light only. */
 :root {
-  color-scheme: dark;
-  --ink: #f4f4f2;
-  --ink-soft: #9a9a96;
-  --paper: #050505;
-  --surface: #121212;
-  --rule: #262626;
-  --on-neon: #0a0a0a;
+  color-scheme: light;
+  --ink: #2b2119;
+  --ink-soft: #7b6a5a;
+  --paper: #f1e7d8;          /* page */
+  --surface: #fbf6ee;        /* cards */
+  --rule: #e6d8c3;
+  --brand: #ef7c22;          /* buttons, active nav */
+  --brand-ink: #d9661a;      /* chart marks: 3:1+ on --surface */
+  --brand-soft: #fbe3cd;
+  --good: #2f8f52;
+  --good-soft: #e1f1e4;
+  --bad: #c8423b;
+  --bad-soft: #f8e0dd;
+  --gold: #e3a92b;
+  --silver: #a7a29b;
+  --bronze: #b8743f;
 
-  --lime: #e6f23e;
-  --pink: #f06db6;
-  --green: #36e07a;
-  --blue: #4c8dff;
-
-  /* Semantic names the pages use */
-  --amber: var(--lime);
-  --amber-soft: color-mix(in srgb, var(--lime) 16%, transparent);
-  --ok: var(--green);
-  --flag: var(--pink);
-  --flag-soft: color-mix(in srgb, var(--pink) 18%, transparent);
+  /* Older names still used by a few pages */
+  --amber: var(--brand);
+  --ok: var(--good);
+  --flag: var(--bad);
+  --flag-soft: var(--bad-soft);
+  --on-neon: var(--ink);
+  --lime: var(--brand);
+  --pink: var(--bad);
+  --green: var(--good);
+  --blue: #4c7fd1;
 }
 
 @theme inline {
@@ -29,60 +37,72 @@
   --color-paper: var(--paper);
   --color-surface: var(--surface);
   --color-rule: var(--rule);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-gold: var(--gold);
+  --color-silver: var(--silver);
+  --color-bronze: var(--bronze);
+  --color-amber: var(--amber);
+  --color-ok: var(--ok);
+  --color-flag: var(--flag);
+  --color-flag-soft: var(--flag-soft);
   --color-on-neon: var(--on-neon);
   --color-lime: var(--lime);
   --color-pink: var(--pink);
   --color-green: var(--green);
   --color-blue: var(--blue);
-  --color-amber: var(--amber);
-  --color-amber-soft: var(--amber-soft);
-  --color-ok: var(--ok);
-  --color-flag: var(--flag);
-  --color-flag-soft: var(--flag-soft);
-  --font-sans: var(--font-archivo);
-  --radius-md: 0.75rem;
-  --radius-lg: 1.25rem;
+  --font-sans: var(--font-nunito);
+  --font-display: var(--font-caveat);
+  --radius-md: 0.6rem;
+  --radius-lg: 0.9rem;
 }
 
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-archivo), system-ui, sans-serif;
-  font-variation-settings: "wdth" 100;
+  font-family: var(--font-nunito), system-ui, sans-serif;
 }
 
-/* Expanded width for headings and the numbers that matter */
-.wide {
-  font-variation-settings: "wdth" 125;
-  font-feature-settings: "tnum" 1;
-  letter-spacing: -0.01em;
+/* Hand-lettered headings, as in the prototype */
+.display {
+  font-family: var(--font-caveat), var(--font-nunito), cursive;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
 }
+/* Kept for older markup: bold numbers and headings in the body font */
+.wide { font-weight: 800; }
 
-.tnum { font-feature-settings: "tnum" 1; }
+.tnum { font-variant-numeric: tabular-nums; }
 
 :focus-visible {
-  outline: 2px solid var(--lime);
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
-/* A solid neon card, as in the brand reference */
-.neon {
-  color: var(--on-neon);
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
   border-radius: var(--radius-lg);
+  box-shadow: 0 1px 0 rgba(43, 33, 25, 0.04);
 }
-.neon a { color: inherit; }
 
 .field {
   width: 100%;
   border: 1px solid var(--rule);
-  background: #0b0b0b;
+  background: #fffdf9;
   color: var(--ink);
-  border-radius: 0.75rem;
-  padding: 0.6rem 0.8rem;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.75rem;
   font-size: 0.9rem;
 }
-.field:focus { border-color: var(--ink); outline: none; }
-.field::placeholder { color: #5f5f5c; }
+.field:focus { border-color: var(--brand); outline: none; }
+.field::placeholder { color: #a89887; }
 
 .btn {
   display: inline-flex;
@@ -90,35 +110,46 @@ body {
   justify-content: center;
   gap: 0.4rem;
   border-radius: 999px;
-  padding: 0.55rem 1.1rem;
+  padding: 0.5rem 1rem;
   font-size: 0.875rem;
-  font-weight: 600;
-  background: var(--ink);
-  color: var(--on-neon);
+  font-weight: 700;
+  background: var(--brand);
+  color: #fff;
   white-space: nowrap;
 }
-.btn:hover { background: #ffffff; }
+.btn:hover { background: #e46f15; }
 .btn:disabled { opacity: 0.5; }
 .btn-quiet {
-  background: transparent;
+  background: var(--surface);
   color: var(--ink);
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--rule);
 }
-.btn-quiet:hover { background: transparent; border-color: var(--ink); }
+.btn-quiet:hover { background: #fff; border-color: var(--ink-soft); }
 
-/* Pill progress bar with a dot at the current value */
-.track {
-  position: relative;
-  height: 0.85rem;
-  border-radius: 999px;
-  border: 2px solid currentColor;
+/* Small rounded filter chip; aria-current marks the active one */
+.chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  border-radius: 999px; padding: 0.25rem 0.75rem;
+  font-size: 0.8rem; font-weight: 700;
+  background: var(--surface); border: 1px solid var(--rule); color: var(--ink-soft);
 }
-.track > span {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: 999px;
-  background: currentColor;
+.chip[aria-current="page"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chip[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
+
+/* Data tables */
+.table { width: 100%; font-size: 0.875rem; }
+.table th {
+  text-align: left; font-weight: 800; font-size: 0.7rem; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-soft); padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--rule); white-space: nowrap;
 }
+.table th small { display: block; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.table td { padding: 0.7rem 1rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+.table tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: #fff9f1; }
+
+/* Hatched fill for the running (incomplete) month in charts */
+.hatch { fill: url(#hatch); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

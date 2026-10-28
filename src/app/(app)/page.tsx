@@ -1,253 +1,158 @@
 import Link from 'next/link';
 import { teamClient } from '@/lib/supabase';
-import { day, OUTCOME_LABEL } from '@/lib/format';
-import { Empty } from '@/components/empty';
-import { reasons, rulesFrom } from '@/lib/attention';
+import { availableMonths, joinedLeft, monthRows, pickMonth, studentRows } from '@/lib/stats';
+import { average, buckets, monthLabel, pctChange, rank } from '@/lib/period';
+import { needs } from '@/lib/needs';
+import { ColumnChart } from '@/components/charts';
+import { MonthPicker } from '@/components/month-picker';
+import { compact, Delta, Kpi, monthOption, PageTitle, RankDot, Section, signed } from '@/components/ui';
 
-export default async function Leaderboard({
-  searchParams,
-}: { searchParams: Promise<{ batch?: string; view?: string }> }) {
+export default async function Overview({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const { db } = await teamClient();
-  const { batch: wanted, view } = await searchParams;
+  const { today, months } = await availableMonths(db);
+  const win = pickMonth((await searchParams).month, months, today);
+  const vsLabel = win.current
+    ? new Date(`${win.prevUpto}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', month: 'short', day: 'numeric' })
+    : monthLabel(win.prev, { short: true });
 
-  const { data: batches } = await db.from('batches').select('id, name, start_date, created_at')
-    .order('created_at', { ascending: false });
-  if (!batches?.length) {
-    return (
-      <Empty title="No students yet">
-        Add your first batch on the <Link className="underline" href="/roster">Roster</Link> page.
-        You can type students in one by one or upload a CSV.
-      </Empty>
-    );
-  }
-  const batch = batches.find((b) => b.id === wanted) ?? batches[0];
-
-  const [{ data: rows }, { data: cfg }] = await Promise.all([
-    db.from('leaderboard').select('*').eq('batch_id', batch.id).eq('status', 'active')
-      .order('batch_rank', { ascending: true, nullsFirst: false }).order('name'),
-    db.from('settings').select('milestones, streak_threshold, quiet_days, challenge_weeks').single(),
+  const chartMonths = months.slice(0, 12).reverse();
+  const [rows, prevRows, jl, students, history] = await Promise.all([
+    monthRows(db, win.m, win.upto),
+    monthRows(db, win.prev, win.prevUpto),
+    joinedLeft(db, win.m, win.upto),
+    studentRows(db),
+    Promise.all(chartMonths.map(async (m) => {
+      const w = pickMonth(m.slice(0, 7), months, today);
+      return { m, current: w.current, rows: await monthRows(db, w.m, w.upto) };
+    })),
   ]);
-  const goal = Math.max(...(cfg?.milestones ?? [100]));
-  const list = rows ?? [];
 
-  // Month by month: the last six IST calendar months, newest last.
-  const byMonth = view === 'months';
-  const monthKeys = lastMonths(6);
-  const { data: monthly } = byMonth && list.length
-    ? await db.from('monthly_stats').select('student_id, month, posts')
-      .in('student_id', list.map((r) => r.id)).gte('month', monthKeys[0])
-    : { data: [] as { student_id: string; month: string; posts: number }[] };
-  const cell = new Map((monthly ?? []).map((m) => [`${m.student_id}|${m.month}`, m.posts]));
-  const monthMax = Math.max(1, ...(monthly ?? []).map((m) => m.posts));
-  const totalPosts = list.reduce((n, r) => n + (r.total_posts ?? 0), 0);
-  const avgProgress = list.length ? Math.min(100, (totalPosts / (list.length * goal)) * 100) : 0;
-  const stats = [
-    { label: 'Posts this week', value: list.reduce((n, r) => n + (r.posts_this_week ?? 0), 0), bg: 'bg-pink' },
-    { label: 'On a streak', value: list.filter((r) => r.current_streak > 0).length, bg: 'bg-green' },
-    {
-      label: 'Need a look', value: list.filter((r) => reasons(r, rulesFrom(cfg)).length).length,
-      bg: 'bg-blue', href: '/flags',
-    },
+  const members = (r: typeof rows) => r.filter((x) => x.in_community);
+  const avgGrowth = average(members(rows).map((r) => r.follower_growth));
+  const avgPosts = average(members(rows).map((r) => r.posts));
+  const prevGrowth = average(members(prevRows).map((r) => r.follower_growth));
+  const prevPosts = average(members(prevRows).map((r) => r.posts));
+  const byId = new Map(students.map((s) => [s.id, s]));
+
+  const active = students.filter((s) => s.status === 'active');
+  const summary = [
+    { label: 'No post for 14+ days', n: active.filter((s) => needs(s).includes('no_post')).length, href: '/attention?f=no_post&d=14' },
+    { label: 'Contract up for renewal within 30 days', n: active.filter((s) => needs(s).includes('contract')).length, href: '/attention?f=contract' },
+    { label: 'Profile couldn’t be read', n: active.filter((s) => needs(s).includes('data')).length, href: '/troubleshooting' },
+    { label: 'Not seen on Heartbeat for 14+ days', n: null, href: '/attention?f=last_seen' },
   ];
+
+  const growthTop = rank(rows.filter((r) => r.follower_growth !== null && byId.get(r.student_id)?.status === 'active'),
+    (r) => r.follower_growth!).slice(0, 5);
+  const { data: topPosts } = await db.from('counted_posts')
+    .select('id, student_id, url, views, final_views, posted_at')
+    .in('post_type', ['reel', 'video'])
+    .gte('posted_at', `${win.m}T00:00:00+05:30`).lte('posted_at', `${win.upto}T23:59:59+05:30`)
+    .not('views', 'is', null)
+    .order('views', { ascending: false }).limit(20);
+  const posts = (topPosts ?? [])
+    .map((p) => ({ ...p, v: p.final_views ?? p.views ?? 0 }))
+    .sort((a, b) => b.v - a.v).slice(0, 5);
+
+  const growthVals = members(rows).map((r) => r.follower_growth).filter((v): v is number => v !== null);
+  const postVals = members(rows).map((r) => r.posts);
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-        <div>
-          <h1 className="wide text-3xl md:text-4xl font-bold">{batch.name}</h1>
-          <p className="text-sm text-ink-soft mt-1">
-            {list.length} active students · ranked by total posts since each student&apos;s start date
-          </p>
-        </div>
-        <a className="btn btn-quiet" href={`/api/export?batch=${batch.id}`}>Export CSV</a>
+      <PageTitle title="Overview" sub="Community performance by month">
+        <MonthPicker value={win.m.slice(0, 7)}
+          options={months.map((m) => ({ value: m.slice(0, 7), label: monthOption(m, m === months[0], today) }))} />
+      </PageTitle>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <Kpi label="Avg. followers gained per student" value={avgGrowth === null ? '–' : signed(Math.round(avgGrowth))}
+          tone={avgGrowth !== null && avgGrowth > 0 ? 'good' : undefined}>
+          <Delta value={pctChange(avgGrowth, prevGrowth)} suffix="%" vs={vsLabel} />
+        </Kpi>
+        <Kpi label="Avg. posts per student" value={avgPosts === null ? '–' : avgPosts.toFixed(1)}>
+          <Delta value={pctChange(avgPosts, prevPosts)} suffix="%" vs={vsLabel} />
+        </Kpi>
+        <Kpi label="Avg. Heartbeat logins per student" value="–">
+          <span className="text-xs text-ink-soft">Heartbeat not connected yet</span>
+        </Kpi>
+        <Kpi label="Students in the community" value={members(rows).length}>
+          <span className="text-xs font-bold text-good">+{jl.joined} joined</span>
+          <span className="text-xs font-bold text-bad">−{jl.left} left</span>
+        </Kpi>
       </div>
 
-      {!!list.length && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <div className="neon bg-lime p-5 col-span-2 lg:col-span-1">
-            <p className="wide text-lg font-bold">100 Post Challenge</p>
-            <p className="text-sm mt-0.5">Batch average {Math.round(avgProgress)}% of {goal}</p>
-            <div className="track mt-4" role="img" aria-label={`Batch average ${Math.round(avgProgress)}%`}>
-              <span style={{ width: `${Math.max(avgProgress, 6)}%` }} />
-            </div>
-          </div>
-          {stats.map((s) => {
-            const body = (
-              <>
-                <p className="wide text-lg font-bold leading-tight">{s.label}</p>
-                <p className="wide text-4xl font-bold mt-3">{s.value}</p>
-              </>
-            );
-            return s.href ? (
-              <Link key={s.label} href={s.href} className={`neon ${s.bg} p-5 hover:brightness-105`}>{body}</Link>
-            ) : (
-              <div key={s.label} className={`neon ${s.bg} p-5`}>{body}</div>
-            );
-          })}
-        </div>
-      )}
+      <div className="grid lg:grid-cols-3 gap-3 mb-4">
+        <Section title="Needs attention" action={<Link href="/attention" className="text-sm font-bold text-brand">View all →</Link>}>
+          <ul className="space-y-2">
+            {summary.map((s) => (
+              <li key={s.label}>
+                <Link href={s.href} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-paper">
+                  <span className={`text-2xl font-extrabold tnum w-8 ${s.n ? 'text-bad' : 'text-ink-soft'}`}>{s.n ?? '–'}</span>
+                  <span className="text-sm">{s.label}{s.n === null && <span className="block text-xs text-ink-soft">once Heartbeat is connected</span>}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-      {batches.length > 1 ? (
-        <nav aria-label="Batches" className="flex flex-wrap gap-2">
-          {batches.map((b) => (
-            <Link
-              key={b.id}
-              href={`/?batch=${b.id}`}
-              aria-current={b.id === batch.id ? 'page' : undefined}
-              className={`rounded-full border px-4 py-1.5 text-sm ${
-                b.id === batch.id ? 'border-ink bg-ink text-on-neon font-semibold' : 'border-rule hover:border-ink'
-              }`}
-            >
-              {b.name}
-            </Link>
-          ))}
-        </nav>
-      ) : <span />}
-        <nav aria-label="View" className="flex rounded-full border border-rule p-1 text-sm">
-          {[['', 'Ranking'], ['months', 'Month by month']].map(([v, label]) => (
-            <Link
-              key={v}
-              href={`/?batch=${batch.id}${v ? `&view=${v}` : ''}`}
-              aria-current={(view ?? '') === v ? 'page' : undefined}
-              className={`rounded-full px-4 py-1 ${(view ?? '') === v ? 'bg-ink text-on-neon font-semibold' : 'text-ink-soft hover:text-ink'}`}
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      {!list.length ? (
-        <Empty title="No active students in this batch">
-          Paused and removed students don&apos;t appear here. Manage them on the{' '}
-          <Link className="underline" href="/roster">Roster</Link>.
-        </Empty>
-      ) : byMonth ? (
-        <div className="bg-surface border border-rule rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-ink-soft border-b border-rule">
-              <tr>
-                <th className="px-4 py-3 font-medium">Student</th>
-                {monthKeys.map((m) => <th key={m} className="px-3 py-3 font-medium text-right">{monthLabel(m)}</th>)}
-                <th className="px-4 py-3 font-medium text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((r) => (
-                <tr key={r.id} className="border-b border-rule last:border-0 hover:bg-white/[0.03]">
-                  <td className="px-4 py-2.5">
-                    <Link href={`/students/${r.id}`} className="font-semibold hover:underline underline-offset-4">{r.name}</Link>
-                  </td>
-                  {monthKeys.map((m) => {
-                    const n = cell.get(`${r.id}|${m}`) ?? 0;
-                    return (
-                      <td key={m} className="px-3 py-2.5 text-right tnum">
-                        <span className="inline-block min-w-8 rounded-md px-1.5 py-0.5 font-semibold"
-                          style={n ? { background: `color-mix(in srgb, var(--blue) ${20 + (n / monthMax) * 80}%, transparent)`,
-                            color: n / monthMax > 0.5 ? 'var(--on-neon)' : undefined } : { color: 'var(--ink-soft)' }}>
-                          {n}
-                        </span>
-                      </td>
-                    );
-                  })}
-                  <td className="px-4 py-2.5 text-right wide font-bold">{r.total_posts ?? 0}</td>
-                </tr>
+        <Section title="Follower growth" action={<Link href="/leaderboard?by=growth" className="text-sm font-bold text-brand">View all →</Link>}>
+          {growthTop.length ? (
+            <ol className="space-y-2">
+              {growthTop.map(({ item, rank: r }) => (
+                <li key={item.student_id} className="flex items-center gap-3 text-sm">
+                  <RankDot rank={r} />
+                  <Link href={`/students/${item.student_id}`} className="flex-1 font-bold truncate hover:underline">
+                    @{byId.get(item.student_id)?.ig_handle}
+                  </Link>
+                  <span className="font-extrabold tnum text-good">{signed(item.follower_growth)}</span>
+                </li>
               ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="bg-surface border border-rule rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-ink-soft border-b border-rule">
-              <tr>
-                <th className="px-4 py-3 font-medium w-16">Rank</th>
-                <th className="px-4 py-3 font-medium">Student</th>
-                <th className="px-4 py-3 font-medium">Posts</th>
-                <th className="px-4 py-3 font-medium">This week</th>
-                <th className="px-4 py-3 font-medium" title={`Weeks in a row with ${cfg?.streak_threshold ?? 1}+ posts`}>Streak</th>
-                <th className="px-4 py-3 font-medium">Milestone</th>
-                <th className="px-4 py-3 font-medium">Last post</th>
-                <th className="px-4 py-3 font-medium">Data</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((r) => {
-                const total = r.total_posts ?? 0;
-                const flagged = r.last_outcome && r.last_outcome !== 'ok';
-                return (
-                  <tr key={r.id} className="border-b border-rule last:border-0 hover:bg-white/[0.03]">
-                    <td className="px-4 py-3">
-                      <span className="wide text-2xl font-bold">{r.batch_rank ?? '–'}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link href={`/students/${r.id}`} className="font-semibold hover:underline underline-offset-4">
-                        {r.name}
-                      </Link>
-                      <a
-                        href={`https://instagram.com/${r.ig_handle}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block text-xs text-ink-soft hover:text-ink"
-                      >
-                        @{r.ig_handle}
-                      </a>
-                    </td>
-                    <td className="px-4 py-3 min-w-36">
-                      <span className="wide text-2xl font-bold">{total}</span>
-                      <span className="text-ink-soft"> / {goal}</span>
-                      <div className="h-1.5 mt-1.5 bg-rule rounded-full overflow-hidden" aria-hidden>
-                        <div className="h-full bg-lime rounded-full" style={{ width: `${Math.min(100, (total / goal) * 100)}%` }} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 tnum">{r.posts_this_week ?? 0}</td>
-                    <td className="px-4 py-3 tnum">
-                      {r.current_streak ? (
-                        <span className="rounded-full bg-green text-on-neon px-2.5 py-0.5 font-semibold">
-                          {r.current_streak} wk
-                        </span>
-                      ) : (
-                        <span className="text-ink-soft">0</span>
-                      )}
-                      {r.longest_streak > r.current_streak && (
-                        <span className="block text-xs text-ink-soft mt-1">best {r.longest_streak}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 tnum">
-                      {r.last_milestone ? <span className="font-semibold text-amber">{r.last_milestone}</span> : '–'}
-                    </td>
-                    <td className="px-4 py-3 text-ink-soft">{day(r.last_post_at) || '–'}</td>
-                    <td className="px-4 py-3">
-                      {flagged ? (
-                        <Link href="/flags" className="text-xs font-semibold rounded-full bg-pink text-on-neon px-2.5 py-0.5 whitespace-nowrap">
-                          {OUTCOME_LABEL[r.last_outcome]}
-                        </Link>
-                      ) : r.last_outcome ? (
-                        <span className="text-xs text-ok">OK</span>
-                      ) : (
-                        <span className="text-xs text-ink-soft">Pending</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </ol>
+          ) : <p className="text-sm text-ink-soft">Needs follower counts from at least two daily scrapes this month.</p>}
+        </Section>
+
+        <Section title="Top posts" action={<Link href="/viral" className="text-sm font-bold text-brand">View all →</Link>}>
+          {posts.length ? (
+            <ol className="space-y-2">
+              {posts.map((p, i) => (
+                <li key={p.id} className="flex items-center gap-3 text-sm">
+                  <RankDot rank={i + 1} />
+                  <span className="flex-1 font-bold truncate">@{byId.get(p.student_id)?.ig_handle}</span>
+                  <span className="tnum font-extrabold">{compact(p.v)}</span>
+                  <a href={p.url} target="_blank" rel="noreferrer" className="text-xs text-ink-soft hover:text-ink">views ↗</a>
+                </li>
+              ))}
+            </ol>
+          ) : <p className="text-sm text-ink-soft">No Reels with views in {monthLabel(win.m)} yet.</p>}
+        </Section>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-3 mb-4">
+        <Section title="Avg. follower growth per month">
+          <ColumnChart title="Average follower growth per student, by month" format={(v) => compact(Math.round(v))}
+            data={history.map((h) => ({ label: monthLabel(h.m, { short: true }), partial: h.current,
+              value: (() => { const a = average(members(h.rows).map((r) => r.follower_growth)); return a === null ? null : Math.round(a); })() }))} />
+        </Section>
+        <Section title="Avg. posts per month">
+          <ColumnChart title="Average posts per student, by month" format={(v) => (Math.round(v * 10) / 10).toString()}
+            data={history.map((h) => ({ label: monthLabel(h.m, { short: true }), partial: h.current,
+              value: average(members(h.rows).map((r) => r.posts)) }))} />
+        </Section>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-3">
+        <Section title="Follower growth range" action={<span className="text-xs text-ink-soft">{monthLabel(win.m)} · students per bucket</span>}>
+          <ColumnChart title={`How many students gained how many followers, ${monthLabel(win.m)}`} format={(v) => String(Math.round(v))}
+            data={buckets(growthVals, [-1e12, 0, 100, 500, 1000, 5000],
+              (lo, hi) => (lo < 0 ? 'Lost' : hi === null ? `${compact(lo)}+` : `${compact(lo)}–${compact(hi)}`))
+              .map((b) => ({ label: b.label, value: b.value }))} />
+        </Section>
+        <Section title="Posting range" action={<span className="text-xs text-ink-soft">{monthLabel(win.m)} · students per bucket</span>}>
+          <ColumnChart title={`How many students posted how often, ${monthLabel(win.m)}`} format={(v) => String(Math.round(v))}
+            data={buckets(postVals, [0, 1, 5, 10, 15, 20], (lo, hi) => (hi === null ? `${lo}+` : hi - lo === 1 ? `${lo}` : `${lo}–${hi - 1}`))
+              .map((b) => ({ label: `${b.label} posts`, value: b.value }))} />
+        </Section>
+      </div>
     </>
   );
-}
-
-/** First day of the last `n` calendar months in IST, oldest first, as YYYY-MM-01. */
-function lastMonths(n: number): string[] {
-  const [y, m] = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }).split('-').map(Number);
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(Date.UTC(y, m - 1 - (n - 1 - i), 1));
-    return d.toISOString().slice(0, 10);
-  });
-}
-function monthLabel(m: string): string {
-  return new Date(`${m}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', month: 'short' });
 }

@@ -22,16 +22,16 @@ export default async function Roster({
 
   return (
     <>
-      <h1 className="wide text-3xl md:text-4xl font-bold mb-6">Roster</h1>
+      <h1 className="display text-4xl mb-6">Roster</h1>
 
       <datalist id="batch-names">
         {batches?.map((b) => <option key={b.name} value={b.name} />)}
       </datalist>
 
       {editing && (
-        <section className="bg-surface border-2 border-lime rounded-lg p-5 mb-8">
+        <section className="bg-surface border-2 border-brand rounded-lg p-5 mb-8">
           <div className="flex justify-between items-baseline">
-            <h2 className="wide text-lg font-bold">Edit {editing.name}</h2>
+            <h2 className="display text-2xl">Edit {editing.name}</h2>
             <Link href="/roster" className="text-sm text-ink-soft hover:text-ink">Close</Link>
           </div>
           <p className="text-sm text-ink-soft mt-1 mb-4">
@@ -78,7 +78,7 @@ export default async function Roster({
 
       <div className="grid lg:grid-cols-2 gap-6 mb-10">
         <section className="bg-surface border border-rule rounded-lg p-5">
-          <h2 className="wide text-lg font-bold mb-4">Add a student</h2>
+          <h2 className="display text-2xl mb-4">Add a student</h2>
           <ActionForm action={addStudent} submit="Add student" resetOnSuccess>
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Name"><input name="name" required className="field" /></Field>
@@ -92,7 +92,7 @@ export default async function Roster({
         </section>
 
         <section className="bg-surface border border-rule rounded-lg p-5">
-          <h2 className="wide text-lg font-bold">Upload a batch</h2>
+          <h2 className="display text-2xl">Upload a batch</h2>
           <p className="text-sm text-ink-soft mt-1 mb-4">
             CSV with the columns <code>name, handle, batch, start_date</code> (the join date), and optionally{' '}
             <code>heartbeat_url, contract_months, contract_end</code>. Dates as YYYY-MM-DD.
@@ -105,7 +105,7 @@ export default async function Roster({
       </div>
 
       <div className="flex justify-between items-baseline mb-3">
-        <h2 className="wide text-lg font-bold">Students ({list.length})</h2>
+        <h2 className="display text-2xl">Students ({list.length})</h2>
         <Link href={show === 'all' ? '/roster' : '/roster?show=all'} className="text-sm underline underline-offset-4">
           {show === 'all' ? 'Hide removed' : 'Show removed'}
         </Link>

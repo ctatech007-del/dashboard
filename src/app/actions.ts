@@ -268,10 +268,6 @@ export async function saveSettings(_: FormState, form: FormData): Promise<FormSt
   // A trigger on settings moves the pg_cron job to the new time.
   const scrape_cron = istToCron(String(form.get('scrape_time') ?? ''));
   if (!scrape_cron) return { error: 'Pick the time of the daily scrape.' };
-  const quiet_days = Number(form.get('quiet_days'));
-  const challenge_weeks = Number(form.get('challenge_weeks'));
-  if (!Number.isInteger(quiet_days) || quiet_days < 1) return { error: 'Quiet days must be 1 or more.' };
-  if (!Number.isInteger(challenge_weeks) || challenge_weeks < 1) return { error: 'Challenge length must be 1 week or more.' };
   const alert_emails = String(form.get('alert_emails') ?? '').split(/[,\s]+/).filter(Boolean);
   if (alert_emails.some((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))) {
     return { error: 'One of the alert emails doesn’t look right.' };
@@ -280,7 +276,7 @@ export async function saveSettings(_: FormState, form: FormData): Promise<FormSt
   const { error } = await db.from('settings').update({
     streak_threshold: threshold,
     milestones: [...new Set(milestones)].sort((a, b) => a - b),
-    sheet_id, scrape_cron, quiet_days, challenge_weeks, alert_emails,
+    sheet_id, scrape_cron, alert_emails,
     updated_at: new Date().toISOString(),
   }).eq('id', 1);
   if (error) return { error: error.message };

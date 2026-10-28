@@ -8,10 +8,10 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   return (
     <main className="min-h-screen grid place-items-center px-6 py-10 overflow-hidden">
       <div className="w-full max-w-sm relative">
-        <Star className="size-56 text-pink -ml-6 mb-2" rays={12} />
+        <Star className="size-56 text-brand -ml-6 mb-2" rays={12} />
         <Star className="absolute size-28 text-ink/80 top-6 right-0" rays={8} />
-        <h1 className="wide text-4xl font-bold uppercase leading-[0.95]">Track every post in one place</h1>
-        <p className="text-ink-soft mt-3 mb-8">CTA Post Tracker · team sign-in. Ask an admin for an invite if you don’t have an account.</p>
+        <h1 className="display text-6xl leading-[0.95]">Student Stats</h1>
+        <p className="text-ink-soft mt-3 mb-8">Creator Takeoff Academy · team sign-in. Ask an admin for an invite if you don’t have an account.</p>
         {error === 'link' && (
           <p role="alert" className="text-sm text-flag bg-flag-soft rounded-md px-3 py-2 mb-6">
             That link has expired or was already used. Ask for a new invite, or reset your password below.

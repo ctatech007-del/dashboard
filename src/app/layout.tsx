@@ -1,22 +1,19 @@
 import type { Metadata } from 'next';
-import { Archivo } from 'next/font/google';
+import { Caveat_Brush, Nunito } from 'next/font/google';
 import './globals.css';
 
-const archivo = Archivo({
-  subsets: ['latin'],
-  axes: ['wdth'],
-  variable: '--font-archivo',
-});
+const nunito = Nunito({ subsets: ['latin'], variable: '--font-nunito' });
+const caveat = Caveat_Brush({ subsets: ['latin'], weight: '400', variable: '--font-caveat' });
 
 export const metadata: Metadata = {
-  title: 'CTA Post Tracker',
-  description: 'Weekly Instagram posting tracker for Creator Takeoff Academy students',
+  title: 'Student Stats · CTA',
+  description: 'Creator Takeoff Academy: how students perform on Instagram, month by month',
   robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={archivo.variable}>
+    <html lang="en" className={`${nunito.variable} ${caveat.variable}`}>
       <body className="antialiased">{children}</body>
     </html>
   );
