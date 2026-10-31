@@ -204,7 +204,7 @@ async function followers(sid, day, n) {
 }
 const one = async (sql, params) => (await db.query(sql, params)).rows[0];
 
-test('intake month rounds the join date to the nearest kickoff; contract end follows its length', async () => {
+test('intake month rounds the join date to the nearest kickoff; contract end is only ever entered by hand', async () => {
   const late = await student('K1', 'kick30', 'Kick', '2026-10-30');
   const early = await student('K2', 'kick02', 'Kick', '2026-11-02');
   const mid = await student('K3', 'kick20', 'Kick', '2026-11-20');
@@ -213,7 +213,9 @@ test('intake month rounds the join date to the nearest kickoff; contract end fol
   assert.equal(await intake(early), '2026-11-01');
   assert.equal(await intake(mid), '2026-12-01');
   await db.query(`update students set contract_months = 6 where id = $1`, [early]);
-  assert.equal((await one(`select contract_end::text e from students where id = $1`, [early])).e, '2027-05-02');
+  assert.equal((await one(`select contract_end e from students where id = $1`, [early])).e, null);
+  await db.query(`update students set contract_end = '2027-05-01' where id = $1`, [early]);
+  assert.equal((await one(`select contract_end::text e from students where id = $1`, [early])).e, '2027-05-01');
 });
 
 test('reel views: updated daily, final on day 7, never changed after', async () => {

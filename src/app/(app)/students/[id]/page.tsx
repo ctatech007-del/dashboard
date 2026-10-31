@@ -5,12 +5,30 @@ import { day, OUTCOME_LABEL, relative } from '@/lib/format';
 import { addNote, addPost, deleteNote, rerunStudent, setExcluded } from '@/app/actions';
 import { ActionForm } from '@/components/forms';
 import { availableMonths, monthRows, pickMonth, studentRows } from '@/lib/stats';
-import { daysBetween, monthLabel, pctChange, rank } from '@/lib/period';
+import { addDays, addMonths, daysBetween, followersOn, monthEnd, monthLabel, monthStart, rank } from '@/lib/period';
 import { needs, NEED_LABEL } from '@/lib/needs';
-import { LineChart } from '@/components/charts';
+import { ColumnChart, LineChart } from '@/components/charts';
 import { MonthPicker } from '@/components/month-picker';
 import { monthYear } from '@/components/student-cells';
-import { compact, Delta, Kpi, monthOption, signed } from '@/components/ui';
+import { compact, Kpi, monthOption, signed } from '@/components/ui';
+
+const longDate = (d: string) =>
+  new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+
+/** "#43 of 100 ▲2" */
+function RankLine({ r }: { r: { rank: number | null; of: number; moved: number | null } }) {
+  if (!r.rank) return null;
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-ink-soft">
+      #{r.rank} of {r.of}
+      {r.moved !== null && r.moved !== 0 && (
+        <span className={`font-bold rounded-full px-1.5 py-0.5 ${r.moved > 0 ? 'bg-good-soft text-good' : 'bg-bad-soft text-bad'}`}>
+          {r.moved > 0 ? '▲' : '▼'} {Math.abs(r.moved)}
+        </span>
+      )}
+    </span>
+  );
+}
 
 const TYPE_LABEL: Record<string, string> = { image: 'Image', carousel: 'Carousel', reel: 'Reel', video: 'Video' };
 
@@ -27,21 +45,19 @@ export default async function StudentPage({ params, searchParams }: {
   const { today, months: allMonths } = await availableMonths(db);
   const win = pickMonth(sp.month, allMonths, today);
 
-  const [{ data: posts }, { data: milestones }, { data: scrapes }, { data: handles }, { data: info },
-    { data: months }, { data: notes }, { data: history }, { data: snaps }, rows, prevRows, everyone] =
+  const [{ data: posts }, { data: scrapes }, { data: handles }, { data: info },
+    { data: notes }, { data: history }, { data: snaps }, rows, prevRows, everyone] =
     await Promise.all([
       db.from('posts').select('id, shortcode, post_type, posted_at, url, source, excluded, excluded_reason, views, final_views')
         .eq('student_id', id)
         .gte('posted_at', `${s.start_date}T00:00:00+05:30`).order('posted_at', { ascending: false }),
-      db.from('milestones_hit').select('milestone, reached_at').eq('student_id', id).order('milestone'),
       db.from('scrape_results').select('outcome, detail, new_posts, created_at').eq('student_id', id)
         .order('created_at', { ascending: false }).limit(8),
       db.from('handle_history').select('old_handle, new_handle, changed_at').eq('student_id', id)
         .order('changed_at', { ascending: false }),
       db.from('students').select('heartbeat_url, intake_month, contract_months, contract_end, leave_date').eq('id', id).single(),
-      db.from('monthly_stats').select('month, posts').eq('student_id', id).order('month', { ascending: false }),
-      db.from('student_notes').select('id, kind, body, author, created_at').eq('student_id', id)
-        .order('created_at', { ascending: false }),
+      db.from('student_notes').select('id, body, author, created_at, contact_date').eq('student_id', id)
+        .order('contact_date', { ascending: false }).order('created_at', { ascending: false }),
       db.from('audit_log').select('id, at, actor, action, detail').eq('student_id', id)
         .order('at', { ascending: false }).limit(15),
       db.from('follower_snapshots').select('day, followers').eq('student_id', id).order('day'),
@@ -57,15 +73,18 @@ export default async function StudentPage({ params, searchParams }: {
   const activeIds = new Set(everyone.filter((x) => x.status === 'active').map((x) => x.id));
   const pool = rows.filter((r) => activeIds.has(r.student_id));
   const me = rows.find((r) => r.student_id === id);
-  const prevMe = prevRows.find((r) => r.student_id === id);
+  const prevPool = prevRows.filter((r) => activeIds.has(r.student_id));
+  // "#43 of 100 ▲2": rank now, and how many places they moved since the comparison period
   const rankOf = (value: (r: (typeof rows)[number]) => number | null) => {
-    const ranked = rank(pool.filter((r) => value(r) !== null), (r) => value(r)!);
-    return { rank: ranked.find((x) => x.item.student_id === id)?.rank ?? null, of: ranked.length };
+    const place = (list: typeof rows) => rank(list.filter((r) => value(r) !== null), (r) => value(r)!);
+    const now = place(pool), before = place(prevPool);
+    const r = now.find((x) => x.item.student_id === id)?.rank ?? null;
+    const p = before.find((x) => x.item.student_id === id)?.rank ?? null;
+    return { rank: r, of: now.length, moved: r !== null && p !== null ? p - r : null };
   };
   const rFollowers = rankOf((r) => r.followers_end);
   const rGrowth = rankOf((r) => r.follower_growth);
   const rPosts = rankOf((r) => r.posts);
-  const vs = win.current ? `same days of ${monthLabel(win.prev, { short: true })}` : monthLabel(win.prev, { short: true });
 
   // Prev / next among active students, alphabetical by handle
   const order = everyone.filter((x) => x.status === 'active').sort((a, b) => a.ig_handle.localeCompare(b.ig_handle));
@@ -79,9 +98,27 @@ export default async function StudentPage({ params, searchParams }: {
   const lastPostDays = row?.noPostDays ?? null;
   const contractLeft = info?.contract_end ? daysBetween(today, info.contract_end) : null;
   const contractTotal = info?.contract_end ? daysBetween(s.start_date, info.contract_end) : null;
-  const range = sp.range === 'year' ? 'year' : sp.range === '90' ? '90' : 'all';
-  const fromDay = range === 'year' ? `${today.slice(0, 4)}-01-01` : range === '90' ? new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10) : '';
+  const RANGES = [['all', 'All time'], ['year', 'This year'], ['6m', 'Last 6 months'], ['1y', 'Last year']] as const;
+  const range = RANGES.find(([v]) => v === sp.range)?.[0] ?? 'all';
+  const fromDay = { all: '', year: `${today.slice(0, 4)}-01-01`, '6m': addMonths(monthStart(today), -5), '1y': addDays(today, -365) }[range];
   const chart = (snaps ?? []).filter((x) => x.day >= fromDay).map((x) => ({ day: x.day, value: x.followers }));
+
+  // Per month for this student, last 12 months (or since joining)
+  const months12 = Array.from({ length: 12 }, (_, i) => addMonths(monthStart(today), i - 11))
+    .filter((m) => m >= monthStart(s.start_date));
+  const istDay = (t: string) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const perMonth = months12.map((m) => {
+    const end = monthEnd(m) < today ? monthEnd(m) : today;
+    const f0 = followersOn(snaps ?? [], m) ?? (snaps ?? []).find((x) => x.day >= m && x.day <= end)?.followers ?? null;
+    const f1 = followersOn(snaps ?? [], end);
+    return {
+      m, current: m === monthStart(today),
+      growth: f0 === null || f1 === null ? null : f1 - f0,
+      posts: counted.filter((x) => istDay(x.posted_at).slice(0, 7) === m.slice(0, 7)).length,
+    };
+  });
+  const reels = counted.filter((x) => x.views !== null)
+    .map((x) => ({ ...x, v: x.final_views ?? x.views! })).sort((a, b) => b.v - a.v).slice(0, 10);
 
   return (
     <>
@@ -111,23 +148,25 @@ export default async function StudentPage({ params, searchParams }: {
               ? <a className="font-bold text-brand hover:underline" href={info.heartbeat_url} target="_blank" rel="noreferrer">Member page on Heartbeat ↗</a>
               : <Link href={`/roster?edit=${s.id}`} className="text-ink-soft hover:text-ink">Add Heartbeat link</Link>}
           </p>
-          <p className="text-sm text-ink-soft mt-2 flex flex-wrap items-center gap-x-2">
-            <span>Member since <strong className="text-ink">{monthYear(info?.intake_month ?? s.start_date)}</strong></span>
-            <span>· {Math.floor(monthsIn)} mo</span>
-            {info?.contract_months && <span>· {info.contract_months}-month contract</span>}
-            {s.status === 'left' && info?.leave_date && <span className="font-bold text-ink">· left {day(info.leave_date)}</span>}
+          <p className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 rounded-full border border-rule bg-surface px-4 py-1.5 text-sm text-ink-soft">
+            <span>Member since <strong className="text-ink">{monthYear(info?.intake_month ?? s.start_date)}</strong> · {Math.floor(monthsIn)} mo</span>
+            {info?.contract_months && <span>{info.contract_months}-month contract</span>}
+            {s.status === 'left' && info?.leave_date
+              ? <strong className="text-ink">Left {day(info.leave_date)}</strong>
+              : contractLeft !== null && contractTotal ? (
+                <>
+                  <span className="w-28 h-1.5 bg-rule rounded-full overflow-hidden" aria-hidden>
+                    <span className={`block h-full rounded-full ${contractLeft <= 30 ? 'bg-bad' : 'bg-brand'}`}
+                      style={{ width: `${Math.min(100, Math.max(0, (1 - contractLeft / contractTotal) * 100))}%` }} />
+                  </span>
+                  <span>
+                    <strong className={contractLeft <= 30 ? 'text-bad' : 'text-ink'}>
+                      {contractLeft < 0 ? `ended ${-contractLeft} days ago` : `${contractLeft} days left`}
+                    </strong> · ends {longDate(info!.contract_end!)}
+                  </span>
+                </>
+              ) : <Link href={`/roster?edit=${s.id}`} className="hover:text-ink">Add contract end date</Link>}
           </p>
-          {contractLeft !== null && contractTotal && s.status !== 'left' && (
-            <div className="flex items-center gap-3 mt-2 text-xs">
-              <span className="w-48 h-1.5 bg-rule rounded-full overflow-hidden" aria-hidden>
-                <span className="block h-full bg-brand rounded-full"
-                  style={{ width: `${Math.min(100, Math.max(0, (1 - contractLeft / contractTotal) * 100))}%` }} />
-              </span>
-              <span className={`font-bold ${contractLeft <= 30 ? 'text-bad' : 'text-ink-soft'}`}>
-                {contractLeft < 0 ? `contract ended ${-contractLeft} days ago` : `${contractLeft} days left`}
-              </span>
-            </div>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <MonthPicker value={win.m.slice(0, 7)}
@@ -152,23 +191,22 @@ export default async function StudentPage({ params, searchParams }: {
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         <Kpi label="Followers" value={compact(me?.followers_end ?? null)}>
-          {rFollowers.rank && <span className="text-xs text-ink-soft">#{rFollowers.rank} of {rFollowers.of}</span>}
+          <RankLine r={rFollowers} />
         </Kpi>
-        <Kpi label={`Follower growth · ${monthLabel(win.m, { short: true })}`} value={signed(me?.follower_growth ?? null)}
+        <Kpi label="Follower growth" value={signed(me?.follower_growth ?? null)}
           tone={(me?.follower_growth ?? 0) > 0 ? 'good' : (me?.follower_growth ?? 0) < 0 ? 'bad' : undefined}>
-          {rGrowth.rank && <span className="text-xs text-ink-soft">#{rGrowth.rank} of {rGrowth.of}</span>}
-          <Delta value={pctChange(me?.follower_growth ?? null, prevMe?.follower_growth ?? null)} suffix="%" vs={vs} />
+          <RankLine r={rGrowth} />
         </Kpi>
         <Kpi label="Last seen on Heartbeat" value="–"><span className="text-xs text-ink-soft">not connected yet</span></Kpi>
-        <Kpi label={`Posts · ${monthLabel(win.m, { short: true })}`} value={me?.posts ?? 0}>
-          {rPosts.rank && <span className="text-xs text-ink-soft">#{rPosts.rank} of {rPosts.of}</span>}
-          <Delta value={pctChange(me?.posts ?? null, prevMe?.posts ?? null)} suffix="%" vs={vs} />
+        <Kpi label="Posts" value={me?.posts ?? 0}>
+          <RankLine r={rPosts} />
         </Kpi>
-        <Kpi label="Avg. posts per month" value={avgPerMonth.toFixed(1)}>
-          <span className="text-xs text-ink-soft">{counted.length} posts since joining</span>
+        <Kpi label="Avg. posts per month" value={<>{avgPerMonth.toFixed(1)} <span className="text-sm font-semibold text-ink-soft">/ month</span></>}>
+          <span className="text-xs text-ink-soft">{counted.length} posts total</span>
         </Kpi>
-        <Kpi label="Days since last post" value={lastPostDays ?? '–'} tone={(lastPostDays ?? 0) >= 14 ? 'bad' : undefined}>
-          <span className="text-xs text-ink-soft">{s.last_post_at ? `last ${day(s.last_post_at)}` : 'no post since joining'}</span>
+        <Kpi label="Days since last post" tone={(lastPostDays ?? 0) >= 14 ? 'bad' : undefined}
+          value={lastPostDays === null ? '–' : <>{lastPostDays} <span className="text-sm font-semibold text-ink-soft">days</span></>}>
+          {!s.last_post_at && <span className="text-xs text-ink-soft">no post since joining</span>}
         </Kpi>
       </div>
 
@@ -176,7 +214,7 @@ export default async function StudentPage({ params, searchParams }: {
         <div className="flex flex-wrap items-baseline justify-between gap-3 mb-2">
           <h2 className="display text-2xl">Follower history</h2>
           <nav aria-label="Range" className="flex gap-1">
-            {([['all', 'All time'], ['year', 'This year'], ['90', '90 days']] as const).map(([v, label]) => (
+            {RANGES.map(([v, label]) => (
               <Link key={v} href={`/students/${id}?range=${v}${sp.month ? `&month=${sp.month}` : ''}${sp.from ? `&from=${sp.from}` : ''}`}
                 aria-current={range === v ? 'page' : undefined} className="chip">{label}</Link>
             ))}
@@ -184,6 +222,76 @@ export default async function StudentPage({ params, searchParams }: {
         </div>
         <LineChart title={`Followers of @${s.ig_handle} per day`} points={chart} format={(v) => compact(Math.round(v))} />
       </section>
+
+      <div className="grid lg:grid-cols-2 gap-3 mb-4">
+        <section className="card p-5">
+          <h2 className="display text-2xl">Follower growth per month</h2>
+          <p className="text-xs text-ink-soft mb-2">{monthLabel(months12[0])} – {monthLabel(months12[months12.length - 1])}</p>
+          <ColumnChart title={`Follower growth of @${s.ig_handle} per month`} format={(v) => compact(Math.round(v))}
+            color="#2f8f52" tint="#a9d3b5"
+            data={perMonth.map((x) => ({ label: monthLabel(x.m, { short: true }), value: x.growth, partial: x.current }))} />
+        </section>
+        <section className="card p-5">
+          <h2 className="display text-2xl">Posts per month</h2>
+          <p className="text-xs text-ink-soft mb-2">{monthLabel(months12[0])} – {monthLabel(months12[months12.length - 1])}</p>
+          <ColumnChart title={`Posts by @${s.ig_handle} per month`} format={(v) => String(Math.round(v))}
+            color="#d9661a" tint="#f2c3a0"
+            data={perMonth.map((x) => ({ label: monthLabel(x.m, { short: true }), value: x.posts, partial: x.current }))} />
+        </section>
+      </div>
+
+      <details className="card mb-4 border-t-4 !border-t-gold">
+        <summary className="flex flex-wrap items-baseline gap-3 px-5 py-4 cursor-pointer list-none">
+          <h2 className="display text-2xl">Best Reels</h2>
+          <span className="text-sm text-ink-soft">
+            {reels[0] ? <>Top: <strong className="text-ink">{compact(reels[0].v)} views</strong> · {longDate(istDay(reels[0].posted_at))}</> : 'No Reels yet'}
+          </span>
+          <span className="ml-auto text-xs text-ink-soft">▾</span>
+        </summary>
+        {!!reels.length && (
+          <ol className="px-5 pb-4 space-y-1.5 text-sm">
+            {reels.map((r, i) => (
+              <li key={r.id} className="flex items-center gap-3">
+                <span className="w-5 text-ink-soft tnum">{i + 1}</span>
+                <span className="flex-1">{longDate(istDay(r.posted_at))}</span>
+                <span className="font-extrabold tnum">{compact(r.v)} views{r.final_views === null && <span className="font-semibold text-ink-soft"> so far</span>}</span>
+                <a href={r.url} target="_blank" rel="noreferrer" className="font-bold text-brand hover:underline">View ↗</a>
+              </li>
+            ))}
+          </ol>
+        )}
+      </details>
+
+      <section className="card p-5 mb-8">
+        <h2 className="display text-2xl">Contact log</h2>
+        <p className="text-sm text-ink-soft mb-3">Notes for the team: calls, messages, how they’re doing</p>
+        <ActionForm action={addNote} submit="Add note" resetOnSuccess className="flex flex-wrap items-start gap-3 [&>div]:mt-0">
+          <input type="hidden" name="student_id" value={s.id} />
+          <textarea name="body" required rows={2} placeholder="e.g. Wrote her on Heartbeat, feels motivated again"
+            className="field flex-1 min-w-64 !border-dashed" aria-label="Note" />
+          <input name="contact_date" type="date" required defaultValue={today} max={today} className="field !w-40" aria-label="Date" />
+        </ActionForm>
+        {notes?.length ? (
+          <ul className="space-y-3 mt-5 text-sm">
+            {notes.map((n) => (
+              <li key={n.id} className="border-l-2 border-brand pl-3">
+                <p className="whitespace-pre-line">{n.body}</p>
+                <p className="text-xs text-ink-soft mt-1 flex items-center gap-2">
+                  {longDate(n.contact_date)} · {n.author}
+                  <form action={deleteNote} className="inline">
+                    <input type="hidden" name="note_id" value={n.id} />
+                    <input type="hidden" name="student_id" value={s.id} />
+                    <button className="underline underline-offset-4 hover:text-ink">Delete</button>
+                  </form>
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-ink-soft text-center mt-5">No notes yet.</p>}
+      </section>
+
+      <details className="mb-4">
+        <summary className="cursor-pointer text-sm font-bold text-ink-soft hover:text-ink mb-4">Posts, corrections and history</summary>
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-8">
         <section>
@@ -256,75 +364,6 @@ export default async function StudentPage({ params, searchParams }: {
 
         <aside className="space-y-8">
           <section>
-            <h2 className="display text-2xl mb-3">Notes & contact log</h2>
-            <ActionForm action={addNote} submit="Save note" resetOnSuccess>
-              <input type="hidden" name="student_id" value={s.id} />
-              <div className="space-y-2">
-                <select name="kind" className="field" aria-label="Kind" defaultValue="note">
-                  <option value="note">Note</option>
-                  <option value="call">Call</option>
-                  <option value="message">Message</option>
-                  <option value="email">Email</option>
-                  <option value="meeting">Meeting</option>
-                </select>
-                <textarea name="body" required rows={3} placeholder="e.g. Called, travelling this week, back to posting Monday"
-                  className="field" aria-label="Note" />
-              </div>
-            </ActionForm>
-            <ul className="space-y-3 mt-5 text-sm">
-              {(notes ?? []).map((n) => (
-                <li key={n.id} className="border-l-2 border-brand pl-3">
-                  <p className="whitespace-pre-line">{n.body}</p>
-                  <p className="text-xs text-ink-soft mt-1">
-                    <span className="capitalize">{n.kind}</span> · {n.author} · {relative(n.created_at)}
-                  </p>
-                  <form action={deleteNote}>
-                    <input type="hidden" name="note_id" value={n.id} />
-                    <input type="hidden" name="student_id" value={s.id} />
-                    <button className="text-xs text-ink-soft underline underline-offset-4 hover:text-ink">Delete</button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="display text-2xl mb-3">Month by month</h2>
-            {months?.length ? (
-              <ul className="space-y-1.5 text-sm">
-                {months.map((m) => (
-                  <li key={m.month} className="grid grid-cols-[90px_1fr_32px] items-center gap-3">
-                    <span className="text-ink-soft">{monthLabel(m.month, { short: true })}</span>
-                    <span className="h-2 bg-rule rounded-full overflow-hidden" aria-hidden>
-                      <span className="block h-full rounded-full bg-brand-ink"
-                        style={{ width: `${(m.posts / Math.max(...months.map((x) => x.posts))) * 100}%` }} />
-                    </span>
-                    <span className="tnum text-right font-semibold">{m.posts}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-ink-soft">No posts yet.</p>
-            )}
-          </section>
-
-          <section>
-            <h2 className="display text-2xl mb-3">Milestones</h2>
-            {milestones?.length ? (
-              <ul className="space-y-2 text-sm">
-                {milestones.map((m) => (
-                  <li key={m.milestone} className="flex justify-between">
-                    <span className="font-bold text-brand">{m.milestone} posts</span>
-                    <span className="text-ink-soft">{day(m.reached_at)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-ink-soft">None reached yet.</p>
-            )}
-          </section>
-
-          <section>
             <h2 className="display text-2xl mb-3">Recent scrapes</h2>
             <ul className="space-y-2 text-sm">
               {(scrapes ?? []).map((r) => (
@@ -369,6 +408,7 @@ export default async function StudentPage({ params, searchParams }: {
           )}
         </aside>
       </div>
+      </details>
     </>
   );
 }

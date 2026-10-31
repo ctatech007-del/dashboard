@@ -148,9 +148,6 @@ body {
 .table tr:last-child td { border-bottom: 0; }
 .table tbody tr:hover td { background: #fff9f1; }
 
-/* Hatched fill for the running (incomplete) month in charts */
-.hatch { fill: url(#hatch); }
-
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }

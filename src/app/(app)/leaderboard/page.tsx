@@ -3,11 +3,15 @@ import { teamClient } from '@/lib/supabase';
 import { studentRows } from '@/lib/stats';
 import { addDays, boardValue, istToday, move, rank, type Board, type Period } from '@/lib/period';
 import { compact, Empty, PageTitle, RankDot, signed, StudentCell } from '@/components/ui';
+import { parseSort, sortBy } from '@/lib/sort';
+import { SortTh, sortHref } from '@/components/sort-header';
 
 const BOARDS: [Board, string][] = [['followers', 'Followers'], ['growth', 'Follower growth'], ['posts', 'Posts']];
 const PERIODS: [Period, string][] = [['1d', '1 day'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'This month']];
 
-export default async function Leaderboard({ searchParams }: { searchParams: Promise<{ by?: string; period?: string }> }) {
+export default async function Leaderboard({ searchParams }: {
+  searchParams: Promise<{ by?: string; period?: string; sort?: string; dir?: string }>;
+}) {
   const { db } = await teamClient();
   const sp = await searchParams;
   const by = (BOARDS.find(([b]) => b === sp.by)?.[0] ?? 'growth') as Board;
@@ -38,10 +42,17 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   const growth = new Map(values(today, 'growth').map((x) => [x.s.id, x.v]));
   const postCount = new Map(values(today, 'posts').map((x) => [x.s.id, x.v]));
   const link = (b: Board, p: Period) => `/leaderboard?by=${b}&period=${p}`;
+  // Rank comes from "Rank by"; the column headers only re-order the view.
+  const sort = parseSort(sp, ['rank', 'followers', 'growth', 'posts', 'move'], { key: 'rank', dir: 'asc' });
+  const href = sortHref('/leaderboard', { by, period });
+  const rowsShown = sortBy(now, sort, (x, k) => ({
+    rank: x.rank, followers: x.item.s.followers, growth: growth.get(x.item.s.id) ?? null,
+    posts: postCount.get(x.item.s.id) ?? null, move: move(x.rank, before.get(x.item.s.id)),
+  }[k]));
 
   return (
     <>
-      <PageTitle title="Leaderboard" sub="Live · updated daily · active students only" />
+      <PageTitle title="Leaderboard" sub="Live · updated daily" />
       <div className="card p-3 mb-4 flex flex-wrap items-center gap-2 text-sm">
         <span className="font-bold text-ink-soft px-1">Rank by</span>
         {BOARDS.map(([b, label]) => <Link key={b} href={link(b, period)} aria-current={by === b ? 'page' : undefined} className="chip">{label}</Link>)}
@@ -56,23 +67,25 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
           <table className="table">
             <thead>
               <tr>
-                <th>#</th><th>Student</th><th>Followers</th>
-                <th>Growth<small>{PERIODS.find(([p]) => p === period)?.[1]}</small></th>
-                <th>Posts<small>{PERIODS.find(([p]) => p === period)?.[1]}</small></th>
-                <th title="Rank change since yesterday">Move</th>
+                <SortTh label="#" k="rank" sort={sort} href={href} firstDir="asc" />
+                <th>Student</th>
+                <SortTh label="Followers" k="followers" sort={sort} href={href} align="right" />
+                <SortTh label="Growth" sub={PERIODS.find(([p]) => p === period)?.[1]} k="growth" sort={sort} href={href} align="right" />
+                <SortTh label="Posts" sub={PERIODS.find(([p]) => p === period)?.[1]} k="posts" sort={sort} href={href} align="right" />
+                <SortTh label="Move" sub="since yesterday" k="move" sort={sort} href={href} />
               </tr>
             </thead>
             <tbody>
-              {now.map(({ item, rank: r }) => {
+              {rowsShown.map(({ item, rank: r }) => {
                 const m = move(r, before.get(item.s.id));
                 const g = growth.get(item.s.id) ?? null;
                 return (
                   <tr key={item.s.id}>
                     <td><RankDot rank={r} /></td>
                     <td><StudentCell id={item.s.id} handle={item.s.ig_handle} name={item.s.name} /></td>
-                    <td className="font-extrabold tnum">{compact(item.s.followers)}</td>
-                    <td className={`font-bold tnum ${g === null ? 'text-ink-soft' : g > 0 ? 'text-good' : g < 0 ? 'text-bad' : ''}`}>{signed(g)}</td>
-                    <td className="tnum font-bold">{postCount.get(item.s.id) ?? 0}</td>
+                    <td className="text-right font-extrabold tnum">{compact(item.s.followers)}</td>
+                    <td className={`text-right font-bold tnum ${g === null ? 'text-ink-soft' : g > 0 ? 'text-good' : g < 0 ? 'text-bad' : ''}`}>{signed(g)}</td>
+                    <td className="text-right tnum font-bold">{postCount.get(item.s.id) ?? 0}</td>
                     <td>
                       {m === null ? <span className="text-xs font-bold text-brand">NEW</span>
                         : m === 0 ? <span className="text-ink-soft">–</span>

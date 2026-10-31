@@ -10,9 +10,10 @@ export function Followers({ s }: { s: StudentRow }) {
   return <span className="font-extrabold tnum">{compact(s.followers)}</span>;
 }
 
+/** Followers gained in the last 30 days */
 export function Growth({ s }: { s: StudentRow }) {
-  if (s.growth === null) return <span className="text-ink-soft">–</span>;
-  return <span className={`font-bold tnum ${s.growth > 0 ? 'text-good' : s.growth < 0 ? 'text-bad' : ''}`}>{signed(s.growth)}</span>;
+  if (s.growth30 === null) return <span className="text-ink-soft">–</span>;
+  return <span className={`font-bold tnum ${s.growth30 > 0 ? 'text-good' : s.growth30 < 0 ? 'text-bad' : ''}`}>{signed(s.growth30)}</span>;
 }
 
 /** Days without a post: amber from a week, red from two. */

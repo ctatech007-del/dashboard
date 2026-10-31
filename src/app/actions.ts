@@ -114,10 +114,11 @@ export async function setExcluded(_: FormState, form: FormData): Promise<FormSta
 export async function addNote(_: FormState, form: FormData): Promise<FormState> {
   const { db, user } = await teamClient();
   const body = String(form.get('body') ?? '').trim();
-  const kind = String(form.get('kind') ?? 'note');
+  const contact_date = String(form.get('contact_date') ?? '') || todayIst();
   if (!body) return { error: 'Write something first.' };
+  if (!isDate(contact_date) || contact_date > todayIst()) return { error: 'Pick the date of the contact (today or earlier).' };
   const { error } = await db.from('student_notes').insert({
-    student_id: String(form.get('student_id')), kind, body, author: user.email,
+    student_id: String(form.get('student_id')), body, contact_date, author: user.email,
   });
   if (error) return { error: error.message };
   revalidatePath(`/students/${form.get('student_id')}`);
@@ -137,7 +138,7 @@ async function batchId(db: Awaited<ReturnType<typeof supabase>>, name: string) {
   return data?.id as string | undefined;
 }
 
-/** Optional master data shared by the add and edit forms. Blank contract end = start + length. */
+/** Optional master data shared by the add and edit forms. The contract end is entered by hand. */
 function masterData(form: FormData): { error: string } | { data: Record<string, unknown> } {
   const text = (k: string) => String(form.get(k) ?? '').trim();
   const heartbeat_url = text('heartbeat_url') || null;
@@ -148,12 +149,14 @@ function masterData(form: FormData): { error: string } | { data: Record<string, 
     return { error: 'Contract length is a number of months, e.g. 6 or 12.' };
   }
   const contract_end = text('contract_end') || null;
+  const email = text('email').toLowerCase() || null;
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: 'That email doesn’t look right.' };
   const leave = text('leave_date') || null;
   const intake = text('intake_month');
   if ([contract_end, leave].some((d) => d && !isDate(d)) || (intake && !/^\d{4}-\d{2}$/.test(intake))) {
     return { error: 'One of the dates isn’t valid.' };
   }
-  const data: Record<string, unknown> = { heartbeat_url, contract_months, contract_end, leave_date: leave };
+  const data: Record<string, unknown> = { heartbeat_url, contract_months, contract_end, leave_date: leave, email };
   if (form.has('intake_month')) data.intake_month = intake ? `${intake}-01` : null;
   return { data };
 }
@@ -221,7 +224,7 @@ export async function uploadCsv(_: FormState, form: FormData): Promise<FormState
   const col = (n: string) => header.indexOf(n);
   const [iName, iHandle, iBatch, iStart] = ['name', 'handle', 'batch', 'start_date'].map(col);
   // Optional columns
-  const [iHeartbeat, iMonths, iEnd] = ['heartbeat_url', 'contract_months', 'contract_end'].map(col);
+  const [iHeartbeat, iMonths, iEnd, iEmail] = ['heartbeat_url', 'contract_months', 'contract_end', 'email'].map(col);
   if ([iName, iHandle, iBatch, iStart].includes(-1)) {
     return { error: 'The CSV needs these columns: name, handle, batch, start_date (YYYY-MM-DD).' };
   }
@@ -242,6 +245,7 @@ export async function uploadCsv(_: FormState, form: FormData): Promise<FormState
     const { error } = await db.from('students').insert({
       name, ig_handle: handle, batch_id: batches.get(batch), start_date: start,
       heartbeat_url: iHeartbeat >= 0 ? r[iHeartbeat] || null : null, contract_months: months, contract_end: end,
+      email: iEmail >= 0 ? r[iEmail]?.toLowerCase() || null : null,
     });
     if (error) problems.push(`row ${line}: ${error.code === '23505' ? `@${handle} already on the roster` : error.message}`);
     else added++;

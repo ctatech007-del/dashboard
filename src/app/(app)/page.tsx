@@ -7,6 +7,11 @@ import { ColumnChart } from '@/components/charts';
 import { MonthPicker } from '@/components/month-picker';
 import { compact, Delta, Kpi, monthOption, PageTitle, RankDot, Section, signed } from '@/components/ui';
 
+// Bucket lower edges and labels, as in the prototype ("< 100" includes anyone who lost followers)
+const GROWTH_RANGE: [number, string][] = [
+  [-Infinity, '< 100'], [100, '100–499'], [500, '500–999'], [1000, '1K–4.9K'], [5000, '5K–9.9K'], [10000, '10K+'],
+];
+
 export default async function Overview({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const { db } = await teamClient();
   const { today, months } = await availableMonths(db);
@@ -36,10 +41,10 @@ export default async function Overview({ searchParams }: { searchParams: Promise
 
   const active = students.filter((s) => s.status === 'active');
   const summary = [
+    { label: 'Not seen on Heartbeat for 14+ days', n: null, href: '/attention?f=last_seen&d=14' },
     { label: 'No post for 14+ days', n: active.filter((s) => needs(s).includes('no_post')).length, href: '/attention?f=no_post&d=14' },
-    { label: 'Contract up for renewal within 30 days', n: active.filter((s) => needs(s).includes('contract')).length, href: '/attention?f=contract' },
-    { label: 'Profile couldn’t be read', n: active.filter((s) => needs(s).includes('data')).length, href: '/troubleshooting' },
-    { label: 'Not seen on Heartbeat for 14+ days', n: null, href: '/attention?f=last_seen' },
+    { label: 'Contract up for renewal within 30 days', n: active.filter((s) => needs(s).includes('contract')).length, href: '/attention?f=contract&d=30' },
+    { label: 'Profile couldn’t be read', n: active.filter((s) => needs(s).includes('data')).length, href: '/attention?f=data' },
   ];
 
   const growthTop = rank(rows.filter((r) => r.follower_growth !== null && byId.get(r.student_id)?.status === 'active'),
@@ -54,6 +59,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     .map((p) => ({ ...p, v: p.final_views ?? p.views ?? 0 }))
     .sort((a, b) => b.v - a.v).slice(0, 5);
 
+  const range = `${monthLabel(chartMonths[0])} – ${monthLabel(chartMonths[chartMonths.length - 1])}`;
   const growthVals = members(rows).map((r) => r.follower_growth).filter((v): v is number => v !== null);
   const postVals = members(rows).map((r) => r.posts);
 
@@ -76,6 +82,10 @@ export default async function Overview({ searchParams }: { searchParams: Promise
           <span className="text-xs text-ink-soft">Heartbeat not connected yet</span>
         </Kpi>
         <Kpi label="Students in the community" value={members(rows).length}>
+          <span className="text-xs font-bold rounded-full px-2 py-0.5 bg-paper tnum">
+            {(() => { const n = members(rows).length - members(prevRows).length; return n === 0 ? '±0' : n > 0 ? `+${n}` : `−${-n}`; })()} students
+            <span className="font-semibold opacity-80"> vs {vsLabel}</span>
+          </span>
           <span className="text-xs font-bold text-good">+{jl.joined} joined</span>
           <span className="text-xs font-bold text-bad">−{jl.left} left</span>
         </Kpi>
@@ -128,29 +138,32 @@ export default async function Overview({ searchParams }: { searchParams: Promise
       </div>
 
       <div className="grid lg:grid-cols-2 gap-3 mb-4">
-        <Section title="Avg. follower growth per month">
+        <Section title="Avg. follower growth per month" action={<span className="text-xs text-ink-soft">{range}</span>}>
           <ColumnChart title="Average follower growth per student, by month" format={(v) => compact(Math.round(v))}
+            color="#2f8f52" tint="#a9d3b5"
             data={history.map((h) => ({ label: monthLabel(h.m, { short: true }), partial: h.current,
               value: (() => { const a = average(members(h.rows).map((r) => r.follower_growth)); return a === null ? null : Math.round(a); })() }))} />
         </Section>
-        <Section title="Avg. posts per month">
+        <Section title="Avg. posts per month" action={<span className="text-xs text-ink-soft">{range}</span>}>
           <ColumnChart title="Average posts per student, by month" format={(v) => (Math.round(v * 10) / 10).toString()}
+            color="#d9661a" tint="#f2c3a0"
             data={history.map((h) => ({ label: monthLabel(h.m, { short: true }), partial: h.current,
               value: average(members(h.rows).map((r) => r.posts)) }))} />
         </Section>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-3">
-        <Section title="Follower growth range" action={<span className="text-xs text-ink-soft">{monthLabel(win.m)} · students per bucket</span>}>
+        <Section title="Follower growth range" action={<span className="text-xs text-ink-soft">{monthLabel(win.m)}</span>}>
           <ColumnChart title={`How many students gained how many followers, ${monthLabel(win.m)}`} format={(v) => String(Math.round(v))}
-            data={buckets(growthVals, [-1e12, 0, 100, 500, 1000, 5000],
-              (lo, hi) => (lo < 0 ? 'Lost' : hi === null ? `${compact(lo)}+` : `${compact(lo)}–${compact(hi)}`))
+            color="#2f8f52" labelAll
+            data={buckets(growthVals, GROWTH_RANGE.map(([lo]) => lo), (lo) => GROWTH_RANGE.find(([e]) => e === lo)![1])
               .map((b) => ({ label: b.label, value: b.value }))} />
         </Section>
-        <Section title="Posting range" action={<span className="text-xs text-ink-soft">{monthLabel(win.m)} · students per bucket</span>}>
+        <Section title="Posting range" action={<span className="text-xs text-ink-soft">{monthLabel(win.m)}</span>}>
           <ColumnChart title={`How many students posted how often, ${monthLabel(win.m)}`} format={(v) => String(Math.round(v))}
-            data={buckets(postVals, [0, 1, 5, 10, 15, 20], (lo, hi) => (hi === null ? `${lo}+` : hi - lo === 1 ? `${lo}` : `${lo}–${hi - 1}`))
-              .map((b) => ({ label: `${b.label} posts`, value: b.value }))} />
+            color="#d9661a" labelAll
+            data={buckets(postVals, [0, 5, 10, 15, 20, 30], (lo, hi) => (hi === null ? `${lo}+` : `${lo}–${hi - 1}`))
+              .map((b) => ({ label: b.label, value: b.value }))} />
         </Section>
       </div>
     </>

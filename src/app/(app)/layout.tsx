@@ -3,6 +3,7 @@ import { teamClient } from '@/lib/supabase';
 import { relative } from '@/lib/format';
 import { signOut } from '@/app/actions';
 import { NavLinks } from '@/components/nav';
+import { SearchBox } from '@/components/search-box';
 import { lastUpdate, studentRows } from '@/lib/stats';
 import { needs } from '@/lib/needs';
 
@@ -34,10 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <div className="min-w-0">
         <header className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-8 py-3">
-          <form action="/students" className="flex-1 max-w-md">
-            <input name="q" type="search" placeholder="Search students" aria-label="Search students"
-              className="field !rounded-full !py-1.5" />
-          </form>
+          <SearchBox />
           <p className="text-xs text-ink-soft">
             {running ? <span className="font-bold text-brand">Updating now…</span>
               : updated ? <>Updated <strong className="text-ink">{relative(updated)}</strong></> : 'No data yet'}

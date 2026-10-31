@@ -11,11 +11,13 @@ export default async function Roster({
   const { edit, show } = await searchParams;
 
   const [{ data: students }, { data: batches }] = await Promise.all([
-    db.from('students').select('id, name, ig_handle, start_date, status, heartbeat_url, intake_month, contract_months, contract_end, leave_date, batches(name)')
+    db.from('students').select('id, name, ig_handle, email, start_date, status, heartbeat_url, intake_month, contract_months, contract_end, leave_date, batches(name)')
       .order('created_at', { ascending: false }),
     db.from('batches').select('name').order('created_at', { ascending: false }),
   ]);
-  const list = (students ?? []).filter((s) => show === 'all' || s.status !== 'removed');
+  // Active = still in the academy (incl. paused); Former = left; All also shows removed entries.
+  const list = (students ?? []).filter((s) => show === 'all' ? true
+    : show === 'former' ? s.status === 'left' : s.status === 'active' || s.status === 'paused');
   const editing = students?.find((s) => s.id === edit);
   const batchName = (s: { batches: unknown }) => (s.batches as { name: string } | null)?.name ?? '';
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -52,6 +54,9 @@ export default async function Roster({
                   <option value="removed">Removed: hidden (added by mistake)</option>
                 </select>
               </Field>
+              <Field label="Email">
+                <input name="email" type="email" defaultValue={editing.email ?? ''} className="field" />
+              </Field>
               <Field label="Heartbeat member page">
                 <input name="heartbeat_url" type="url" defaultValue={editing.heartbeat_url ?? ''} placeholder="https://…" className="field" />
               </Field>
@@ -69,8 +74,7 @@ export default async function Roster({
               </Field>
             </div>
             <p className="text-xs text-ink-soft mt-2">
-              Leave “Contract ends” empty to work it out from the join date and length. Intake decides which
-              month a student counts towards in averages (kickoffs around the 1st).
+              Intake decides which month a student counts towards in averages (kickoffs around the 1st).
             </p>
           </ActionForm>
         </section>
@@ -85,8 +89,10 @@ export default async function Roster({
               <Field label="Instagram handle"><input name="handle" required placeholder="@handle or profile link" className="field" /></Field>
               <Field label="Batch"><input name="batch" required list="batch-names" placeholder="e.g. Nov 2026" className="field" /></Field>
               <Field label="Join date"><input name="start_date" type="date" required defaultValue={today} className="field" /></Field>
+              <Field label="Email"><input name="email" type="email" className="field" /></Field>
               <Field label="Heartbeat member page"><input name="heartbeat_url" type="url" placeholder="https://…" className="field" /></Field>
               <Field label="Contract length (months)"><input name="contract_months" type="number" min={1} max={60} placeholder="6 or 12" className="field" /></Field>
+              <Field label="Contract ends"><input name="contract_end" type="date" className="field" /></Field>
             </div>
           </ActionForm>
         </section>
@@ -95,7 +101,7 @@ export default async function Roster({
           <h2 className="display text-2xl">Upload a batch</h2>
           <p className="text-sm text-ink-soft mt-1 mb-4">
             CSV with the columns <code>name, handle, batch, start_date</code> (the join date), and optionally{' '}
-            <code>heartbeat_url, contract_months, contract_end</code>. Dates as YYYY-MM-DD.
+            <code>email, heartbeat_url, contract_months, contract_end</code>. Dates as YYYY-MM-DD.
             Handles already on the roster are skipped.
           </p>
           <ActionForm action={uploadCsv} submit="Upload CSV">
@@ -106,11 +112,14 @@ export default async function Roster({
 
       <div className="flex justify-between items-baseline mb-3">
         <h2 className="display text-2xl">Students ({list.length})</h2>
-        <Link href={show === 'all' ? '/roster' : '/roster?show=all'} className="text-sm underline underline-offset-4">
-          {show === 'all' ? 'Hide removed' : 'Show removed'}
-        </Link>
+        <nav aria-label="Show" className="flex gap-1">
+          {([['active', 'Active'], ['former', 'Former'], ['all', 'All']] as const).map(([v, label]) => (
+            <Link key={v} href={v === 'active' ? '/roster' : `/roster?show=${v}`}
+              aria-current={(show ?? 'active') === v ? 'page' : undefined} className="chip">{label}</Link>
+          ))}
+        </nav>
       </div>
-      <div className="bg-surface border border-rule rounded-lg overflow-x-auto">
+      <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-ink-soft border-b border-rule">
             <tr>

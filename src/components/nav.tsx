@@ -9,10 +9,11 @@ const MAIN = [
   { href: '/attention', label: 'Needs attention', match: (p: string) => p.startsWith('/attention'), badge: true },
   { href: '/leaderboard', label: 'Leaderboard', match: (p: string) => p.startsWith('/leaderboard') },
   { href: '/viral', label: 'Viral Reels', match: (p: string) => p.startsWith('/viral') },
-  { href: '/rewards', label: 'Rewards', match: (p: string) => p.startsWith('/rewards') },
 ];
+// Not for daily use: below the divider, as the client asked
 const TOOLS = [
   { href: '/troubleshooting', label: 'Troubleshooting', match: (p: string) => p.startsWith('/troubleshooting') },
+  { href: '/rewards', label: 'Rewards', match: (p: string) => p.startsWith('/rewards') },
   { href: '/roster', label: 'Roster', match: (p: string) => p.startsWith('/roster') },
   { href: '/settings', label: 'Settings', match: (p: string) => p.startsWith('/settings') },
 ];

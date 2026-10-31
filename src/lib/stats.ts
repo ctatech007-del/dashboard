@@ -57,6 +57,9 @@ export interface StudentRow {
   followers: number | null;          // latest count
   growth: number | null;             // this month so far
   posts: number;                     // this month so far
+  growth30: number | null;           // last 30 days
+  posts30: number;                   // last 30 days (since joining)
+  email: string | null;
   lastPost: string | null;           // ISO
   noPostDays: number | null;         // days since the last counted post (or since joining)
   contractDays: number | null;       // days until the contract ends
@@ -68,7 +71,8 @@ export interface StudentRow {
 export async function studentRows(db: DB): Promise<StudentRow[]> {
   const today = istToday();
   const m = monthStart(today);
-  const [{ data: students }, rows, { data: snaps }, { data: notes }] = await Promise.all([
+  const since30 = addDays(today, -30);
+  const [{ data: students }, rows, { data: snaps }, { data: notes }, { data: recent }] = await Promise.all([
     db.from('leaderboard')
       .select('id, name, ig_handle, status, start_date, last_post_at, last_outcome')
       .neq('status', 'removed'),
@@ -76,14 +80,25 @@ export async function studentRows(db: DB): Promise<StudentRow[]> {
     db.from('follower_snapshots').select('student_id, day, followers')
       .gte('day', addDays(today, -40)).order('day', { ascending: false }),
     db.from('student_notes').select('student_id, body, created_at, author').order('created_at', { ascending: false }),
+    db.from('counted_posts').select('student_id, posted_at').gte('posted_at', `${since30}T00:00:00+05:30`),
   ]);
   const { data: extra } = await db.from('students')
-    .select('id, intake_month, leave_date, contract_months, contract_end, heartbeat_url')
+    .select('id, intake_month, leave_date, contract_months, contract_end, heartbeat_url, email')
     .neq('status', 'removed');
 
   const byMonth = new Map(rows.map((r) => [r.student_id, r]));
+  // Snapshots arrive newest first: the first one per student is today's count; the 30-day base is the
+  // newest on or before 30 days ago, or the oldest we have when they're newer than that.
   const latest = new Map<string, number>();
-  for (const s of snaps ?? []) if (!latest.has(s.student_id)) latest.set(s.student_id, s.followers);
+  const before30 = new Map<string, number>();     // newest count on or before 30 days ago
+  const oldestIn30 = new Map<string, number>();   // oldest count inside the 30 days
+  for (const s of snaps ?? []) {
+    if (!latest.has(s.student_id)) latest.set(s.student_id, s.followers);
+    if (s.day <= since30) { if (!before30.has(s.student_id)) before30.set(s.student_id, s.followers); }
+    else oldestIn30.set(s.student_id, s.followers);
+  }
+  const posts30 = new Map<string, string[]>();
+  for (const p of recent ?? []) posts30.set(p.student_id, [...(posts30.get(p.student_id) ?? []), p.posted_at]);
   const lastNote = new Map<string, StudentRow['lastNote']>();
   for (const n of notes ?? []) if (!lastNote.has(n.student_id)) lastNote.set(n.student_id, n);
   const more = new Map((extra ?? []).map((e) => [e.id, e]));
@@ -102,6 +117,13 @@ export async function studentRows(db: DB): Promise<StudentRow[]> {
       followers: latest.get(s.id) ?? null,
       growth: r?.follower_growth ?? null,
       posts: r?.posts ?? 0,
+      growth30: (() => {
+        const now = latest.get(s.id), base = before30.get(s.id) ?? oldestIn30.get(s.id);
+        return now === undefined || base === undefined ? null : now - base;
+      })(),
+      posts30: (posts30.get(s.id) ?? []).filter((t) =>
+        new Date(t).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) >= s.start_date).length,
+      email: e?.email ?? null,
       lastPost: s.last_post_at,
       noPostDays: since <= today ? daysBetween(since, today) : null,
       contractDays: e?.contract_end ? daysBetween(today, e.contract_end) : null,

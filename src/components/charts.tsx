@@ -1,6 +1,7 @@
 // Small SVG charts, drawn on the server. Single series, so no legend: the card title names it.
-// Bars are ≤24px with 4px rounded tops; the running month is hatched and labelled "so far" so it
-// never reads as a complete month. Every mark has a hover tooltip and every chart a table twin.
+// Bars are ≤24px with 4px rounded tops. As in the client's prototype, past months use a light tint
+// and the running month the full colour, with "(so far)" in its tooltip so it never reads as a
+// complete month. Every mark has a hover tooltip and every chart a table twin.
 
 const W = 600;
 const PAD = { t: 18, r: 8, b: 26, l: 40 };
@@ -19,8 +20,9 @@ function niceTicks(min: number, max: number, count = 3) {
 
 export interface Column { label: string; value: number | null; partial?: boolean; tip?: string }
 
-export function ColumnChart({ data, format, height = 200, title }: {
+export function ColumnChart({ data, format, height = 200, title, color = MARK, tint, labelAll = false }: {
   data: Column[]; format: (v: number) => string; height?: number; title: string;
+  color?: string; tint?: string; labelAll?: boolean;
 }) {
   const vals = data.map((d) => d.value ?? 0);
   const ticks = niceTicks(Math.min(0, ...vals), Math.max(1, ...vals));
@@ -34,12 +36,6 @@ export function ColumnChart({ data, format, height = 200, title }: {
   return (
     <figure>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={title}>
-        <defs>
-          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width="6" height="6" fill="#f6c9a3" />
-            <line x1="0" y1="0" x2="0" y2="6" stroke={MARK} strokeWidth="2" />
-          </pattern>
-        </defs>
         {ticks.map((t) => (
           <g key={t}>
             <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke={RULE} strokeWidth="1" />
@@ -57,12 +53,12 @@ export function ColumnChart({ data, format, height = 200, title }: {
           const path = neg
             ? `M${cx - bw / 2},${top} h${bw} v${h - r} q0,${r} ${-r},${r} h${-(bw - 2 * r)} q${-r},0 ${-r},${-r} z`
             : `M${cx - bw / 2},${top + h} v${-(h - r)} q0,${-r} ${r},${-r} h${bw - 2 * r} q${r},0 ${r},${r} v${h - r} z`;
-          const showValue = v !== null && (d.partial || i === maxI || i === data.length - 1);
+          const showValue = v !== null && (labelAll || d.partial || i === maxI || i === data.length - 1);
           return (
             <g key={d.label}>
               <title>{d.tip ?? `${d.label}: ${v === null ? 'no data' : format(v)}${d.partial ? ' (so far)' : ''}`}</title>
               <rect x={cx - band / 2} y={PAD.t} width={band} height={ih} fill="transparent" />
-              {v !== null && <path d={path} fill={d.partial ? 'url(#hatch)' : MARK} />}
+              {v !== null && <path d={path} fill={tint && !d.partial ? tint : color} />}
               {showValue && (
                 <text x={cx} y={neg ? top + h + 13 : top - 5} textAnchor="middle" fontSize="11" fontWeight="700" fill="#2b2119" className="tnum">
                   {format(v!)}
@@ -75,10 +71,7 @@ export function ColumnChart({ data, format, height = 200, title }: {
         <line x1={PAD.l} x2={W - PAD.r} y1={y(0)} y2={y(0)} stroke={INK_SOFT} strokeWidth="1" />
       </svg>
       {data.some((d) => d.partial) && (
-        <figcaption className="text-xs text-ink-soft mt-1 flex items-center gap-1.5">
-          <svg width="14" height="10" aria-hidden><rect width="14" height="10" rx="2" className="hatch" /></svg>
-          Hatched = this month so far (incomplete)
-        </figcaption>
+        <figcaption className="text-xs text-ink-soft mt-1">The current month is so far, not complete.</figcaption>
       )}
       <table className="sr-only">
         <caption>{title}</caption>
