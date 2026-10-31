@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { teamClient } from '@/lib/supabase';
-import { availableMonths, joinedLeft, monthRows, pickMonth, studentRows } from '@/lib/stats';
+import { availableMonths, joinedLeft, loginDays, monthRows, pickMonth, studentRows } from '@/lib/stats';
 import { average, buckets, monthLabel, pctChange, rank } from '@/lib/period';
 import { needs } from '@/lib/needs';
 import { ColumnChart } from '@/components/charts';
@@ -21,7 +21,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     : monthLabel(win.prev, { short: true });
 
   const chartMonths = months.slice(0, 12).reverse();
-  const [rows, prevRows, jl, students, history] = await Promise.all([
+  const [rows, prevRows, jl, students, history, logins, prevLogins] = await Promise.all([
     monthRows(db, win.m, win.upto),
     monthRows(db, win.prev, win.prevUpto),
     joinedLeft(db, win.m, win.upto),
@@ -30,6 +30,8 @@ export default async function Overview({ searchParams }: { searchParams: Promise
       const w = pickMonth(m.slice(0, 7), months, today);
       return { m, current: w.current, rows: await monthRows(db, w.m, w.upto) };
     })),
+    loginDays(db, win.m, win.upto),
+    loginDays(db, win.prev, win.prevUpto),
   ]);
 
   const members = (r: typeof rows) => r.filter((x) => x.in_community);
@@ -38,10 +40,14 @@ export default async function Overview({ searchParams }: { searchParams: Promise
   const prevGrowth = average(members(prevRows).map((r) => r.follower_growth));
   const prevPosts = average(members(prevRows).map((r) => r.posts));
   const byId = new Map(students.map((s) => [s.id, s]));
+  // Heartbeat: days logged in, per student in the community who's linked to Heartbeat
+  const linked = (r: typeof rows) => members(r).filter((x) => byId.get(x.student_id)?.heartbeatLinked);
+  const avgLogins = average(linked(rows).map((r) => logins.get(r.student_id) ?? 0));
+  const prevAvgLogins = average(linked(prevRows).map((r) => prevLogins.get(r.student_id) ?? 0));
 
   const active = students.filter((s) => s.status === 'active');
   const summary = [
-    { label: 'Not seen on Heartbeat for 14+ days', n: null, href: '/attention?f=last_seen&d=14' },
+    { label: 'Not seen on Heartbeat for 14+ days', n: active.filter((s) => needs(s).includes('last_seen')).length, href: '/attention?f=last_seen&d=14' },
     { label: 'No post for 14+ days', n: active.filter((s) => needs(s).includes('no_post')).length, href: '/attention?f=no_post&d=14' },
     { label: 'Contract up for renewal within 30 days', n: active.filter((s) => needs(s).includes('contract')).length, href: '/attention?f=contract&d=30' },
     { label: 'Profile couldn’t be read', n: active.filter((s) => needs(s).includes('data')).length, href: '/attention?f=data' },
@@ -78,8 +84,10 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         <Kpi label="Avg. posts per student" value={avgPosts === null ? '–' : avgPosts.toFixed(1)}>
           <Delta value={pctChange(avgPosts, prevPosts)} suffix="%" vs={vsLabel} />
         </Kpi>
-        <Kpi label="Avg. Heartbeat logins per student" value="–">
-          <span className="text-xs text-ink-soft">Heartbeat not connected yet</span>
+        <Kpi label="Avg. Heartbeat logins per student" value={avgLogins === null ? '–' : avgLogins.toFixed(1)}>
+          {avgLogins === null
+            ? <span className="text-xs text-ink-soft">no students linked to Heartbeat yet</span>
+            : <Delta value={pctChange(avgLogins, prevAvgLogins)} suffix="%" vs={vsLabel} />}
         </Kpi>
         <Kpi label="Students in the community" value={members(rows).length}>
           <span className="text-xs font-bold rounded-full px-2 py-0.5 bg-paper tnum">
@@ -97,8 +105,8 @@ export default async function Overview({ searchParams }: { searchParams: Promise
             {summary.map((s) => (
               <li key={s.label}>
                 <Link href={s.href} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-paper">
-                  <span className={`text-2xl font-extrabold tnum w-8 ${s.n ? 'text-bad' : 'text-ink-soft'}`}>{s.n ?? '–'}</span>
-                  <span className="text-sm">{s.label}{s.n === null && <span className="block text-xs text-ink-soft">once Heartbeat is connected</span>}</span>
+                  <span className={`text-2xl font-extrabold tnum w-8 ${s.n ? 'text-bad' : 'text-ink-soft'}`}>{s.n}</span>
+                  <span className="text-sm">{s.label}</span>
                 </Link>
               </li>
             ))}

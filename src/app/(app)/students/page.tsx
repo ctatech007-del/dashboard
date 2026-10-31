@@ -10,7 +10,7 @@ const TABS = [['active', 'Active'], ['former', 'Former'], ['all', 'All']] as con
 const KEYS = ['student', 'followers', 'growth', 'posts', 'nopost', 'seen', 'contact', 'contract'];
 const value = (s: StudentRow, k: string) => ({
   student: s.ig_handle, followers: s.followers, growth: s.growth30, posts: s.posts30, nopost: s.noPostDays,
-  seen: null, contact: s.lastNote?.created_at ?? null, contract: s.contractDays,
+  seen: s.lastSeenDays, contact: s.lastNote?.created_at ?? null, contract: s.contractDays,
 }[k]);
 
 export default async function Students({ searchParams }: {
@@ -75,7 +75,7 @@ export default async function Students({ searchParams }: {
                   <td className="text-right"><Growth s={s} /></td>
                   <td className="text-right tnum font-bold">{s.status === 'left' ? '–' : s.posts30}</td>
                   <td className="text-right"><NoPost s={s} /></td>
-                  <td className="text-right"><LastSeen /></td>
+                  <td className="text-right"><LastSeen s={s} /></td>
                   <td className="text-right"><LastContact s={s} /></td>
                   <td className="text-right"><ContractEnds s={s} /></td>
                 </tr>

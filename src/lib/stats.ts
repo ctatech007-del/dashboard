@@ -60,6 +60,9 @@ export interface StudentRow {
   growth30: number | null;           // last 30 days
   posts30: number;                   // last 30 days (since joining)
   email: string | null;
+  heartbeatLinked: boolean;          // matched to a Heartbeat member
+  lastSeen: string | null;           // latest Heartbeat login
+  lastSeenDays: number | null;
   lastPost: string | null;           // ISO
   noPostDays: number | null;         // days since the last counted post (or since joining)
   contractDays: number | null;       // days until the contract ends
@@ -83,7 +86,7 @@ export async function studentRows(db: DB): Promise<StudentRow[]> {
     db.from('counted_posts').select('student_id, posted_at').gte('posted_at', `${since30}T00:00:00+05:30`),
   ]);
   const { data: extra } = await db.from('students')
-    .select('id, intake_month, leave_date, contract_months, contract_end, heartbeat_url, email')
+    .select('id, intake_month, leave_date, contract_months, contract_end, heartbeat_url, email, heartbeat_user_id, heartbeat_last_login')
     .neq('status', 'removed');
 
   const byMonth = new Map(rows.map((r) => [r.student_id, r]));
@@ -124,6 +127,10 @@ export async function studentRows(db: DB): Promise<StudentRow[]> {
       posts30: (posts30.get(s.id) ?? []).filter((t) =>
         new Date(t).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) >= s.start_date).length,
       email: e?.email ?? null,
+      heartbeatLinked: !!e?.heartbeat_user_id,
+      lastSeen: e?.heartbeat_last_login ?? null,
+      lastSeenDays: e?.heartbeat_last_login
+        ? daysBetween(new Date(e.heartbeat_last_login).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }), today) : null,
       lastPost: s.last_post_at,
       noPostDays: since <= today ? daysBetween(since, today) : null,
       contractDays: e?.contract_end ? daysBetween(today, e.contract_end) : null,
@@ -131,6 +138,14 @@ export async function studentRows(db: DB): Promise<StudentRow[]> {
       lastNote: lastNote.get(s.id) ?? null,
     } as StudentRow;
   });
+}
+
+/** Days each student logged in to Heartbeat within [from, to] (IST days). */
+export async function loginDays(db: DB, from: string, to: string) {
+  const { data } = await db.from('heartbeat_logins').select('student_id').gte('day', from).lte('day', to);
+  const out = new Map<string, number>();
+  for (const r of data ?? []) out.set(r.student_id, (out.get(r.student_id) ?? 0) + 1);
+  return out;
 }
 
 /** Time of the last finished full scrape, for "Updated X ago". */

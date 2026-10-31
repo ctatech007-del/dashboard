@@ -197,7 +197,10 @@ export default async function StudentPage({ params, searchParams }: {
           tone={(me?.follower_growth ?? 0) > 0 ? 'good' : (me?.follower_growth ?? 0) < 0 ? 'bad' : undefined}>
           <RankLine r={rGrowth} />
         </Kpi>
-        <Kpi label="Last seen on Heartbeat" value="–"><span className="text-xs text-ink-soft">not connected yet</span></Kpi>
+        <Kpi label="Last seen on Heartbeat" tone={(row?.lastSeenDays ?? 0) >= 14 ? 'bad' : undefined}
+          value={row?.lastSeen ? relative(row.lastSeen) : '–'}>
+          {!row?.heartbeatLinked && <Link href={`/roster?edit=${s.id}`} className="text-xs text-ink-soft hover:text-ink">not linked: add their email</Link>}
+        </Kpi>
         <Kpi label="Posts" value={me?.posts ?? 0}>
           <RankLine r={rPosts} />
         </Kpi>

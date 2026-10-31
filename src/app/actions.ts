@@ -277,10 +277,14 @@ export async function saveSettings(_: FormState, form: FormData): Promise<FormSt
     return { error: 'One of the alert emails doesn’t look right.' };
   }
 
+  const reward_messages = form.get('reward_messages') === 'on';
+  const reward_message = String(form.get('reward_message') ?? '').trim();
+  if (reward_messages && !reward_message) return { error: 'Write the reward message before switching it on.' };
+
   const { error } = await db.from('settings').update({
     streak_threshold: threshold,
     milestones: [...new Set(milestones)].sort((a, b) => a - b),
-    sheet_id, scrape_cron, alert_emails,
+    sheet_id, scrape_cron, alert_emails, reward_messages, ...(reward_message ? { reward_message } : {}),
     updated_at: new Date().toISOString(),
   }).eq('id', 1);
   if (error) return { error: error.message };

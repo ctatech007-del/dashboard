@@ -17,7 +17,7 @@ const DEFAULT_SORT: Record<Filter, { key: string; dir: 'asc' | 'desc' }> = {
   contract: { key: 'contract', dir: 'asc' }, data: { key: 'nopost', dir: 'desc' },
 };
 const value = (s: StudentRow, k: string) => ({
-  student: s.ig_handle, seen: null, nopost: s.noPostDays, posts: s.posts30, contract: s.contractDays,
+  student: s.ig_handle, seen: s.lastSeenDays, nopost: s.noPostDays, posts: s.posts30, contract: s.contractDays,
   followers: s.followers, contact: s.lastNote?.created_at ?? null,
 }[k]);
 
@@ -33,7 +33,7 @@ export default async function Attention({ searchParams }: {
   const active = (await studentRows(db)).filter((s) => s.status === 'active');
   const inBracket = (s: StudentRow) => {
     if (f === 'data') return s.lastOutcome !== 'ok';
-    if (f === 'last_seen') return false;                        // Heartbeat isn't connected yet (Phase 4)
+    if (f === 'last_seen') return s.lastSeenDays !== null && (d === 'all' || s.lastSeenDays >= d);
     if (f === 'contract') return s.contractDays !== null && (d === 'all' || s.contractDays <= d);
     return s.noPostDays !== null && (d === 'all' || s.noPostDays >= d);
   };
@@ -65,9 +65,7 @@ export default async function Attention({ searchParams }: {
           )}
         </div>
 
-        {f === 'last_seen' ? (
-          <div className="px-4 pb-4"><Empty title="Heartbeat isn’t connected yet">“Last seen” fills in once the Heartbeat sync is live.</Empty></div>
-        ) : !rows.length ? (
+        {!rows.length ? (
           <div className="px-4 pb-4"><Empty title="Nobody here">No active student matches this filter.</Empty></div>
         ) : (
           <div className="overflow-x-auto">
@@ -96,7 +94,7 @@ export default async function Attention({ searchParams }: {
                         </Link>
                       )}
                     </td>
-                    <td className="text-right"><LastSeen /></td>
+                    <td className="text-right"><LastSeen s={s} /></td>
                     <td className="text-right"><NoPost s={s} /></td>
                     <td className="text-right tnum font-bold">{s.posts30}</td>
                     <td className="text-right"><ContractEnds s={s} /></td>

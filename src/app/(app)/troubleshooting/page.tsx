@@ -39,6 +39,10 @@ export default async function Troubleshooting() {
     callFunction('health').then((r) => (r.res.ok ? (r.body as Health) : {})).catch(() => ({} as Health)),
     db.from('open_flags').select('*').order('days_without_data', { ascending: false, nullsFirst: true }),
   ]);
+  const { data: unlinked } = await db.from('students').select('id, name, ig_handle, email')
+    .eq('status', 'active').is('heartbeat_user_id', null).order('ig_handle');
+  const { data: lastHb } = await db.from('students').select('heartbeat_last_login')
+    .not('heartbeat_user_id', 'is', null).order('heartbeat_last_login', { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
   const { data: renames } = await db.from('rename_requests')
     .select('id, old_handle, new_handle, status, detail, created_at, student_id')
     .in('status', ['needs_review', 'checking']).order('created_at', { ascending: false });
@@ -70,6 +74,11 @@ export default async function Troubleshooting() {
       label: 'Google Sheet', ok: !cfg?.sheet_id ? null : lastSheet ? lastSheet === 'ok' : null,
       detail: !cfg?.sheet_id ? 'not connected' : !health.secrets?.google ? 'service account key missing'
         : lastSheet === 'ok' ? 'synced after the last run' : lastSheet ?? 'not synced yet',
+    },
+    {
+      label: 'Heartbeat', ok: health.secrets ? !!health.secrets.heartbeat && !!lastHb : null,
+      detail: !health.secrets ? 'couldn’t check' : !health.secrets.heartbeat ? 'API key missing'
+        : lastHb ? `syncing every 3 hours · ${unlinked?.length ?? 0} not linked` : 'key set, waiting for the first sync',
     },
     {
       label: 'Failure alerts', ok: health.secrets?.alerts && cfg?.alert_emails?.length ? true : null,
@@ -132,6 +141,26 @@ export default async function Troubleshooting() {
             ))}
           </ul>
         </>
+      )}
+
+      {!!unlinked?.length && (
+        <details className="card p-4 mb-10">
+          <summary className="cursor-pointer font-bold">
+            {unlinked.length} active student{unlinked.length === 1 ? '' : 's'} not linked to Heartbeat
+            <span className="block text-sm font-normal text-ink-soft">
+              No “last seen”, logins or reward messages for them. Fix: add their Heartbeat email in the roster
+              (or their Instagram link on their Heartbeat profile); the next sync links them.
+            </span>
+          </summary>
+          <ul className="mt-3 grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+            {unlinked.map((u) => (
+              <li key={u.id} className="flex justify-between gap-3">
+                <span>@{u.ig_handle} <span className="text-ink-soft">· {u.email ?? 'no email'}</span></span>
+                <Link href={`/roster?edit=${u.id}`} className="text-brand font-bold hover:underline">Edit</Link>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       <h2 className="display text-2xl mb-3">Health</h2>

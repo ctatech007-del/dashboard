@@ -9,6 +9,7 @@ Deno.serve(async (req) => {
     apify: !!APIFY_TOKEN,
     google: !!Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON'),
     alerts: !!Deno.env.get('RESEND_API_KEY'),
+    heartbeat: !!Deno.env.get('HEARTBEAT_API_KEY'),
   };
 
   let apify: { usedUsd: number; limitUsd: number | null } | { error: string };

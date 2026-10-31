@@ -23,8 +23,12 @@ export function NoPost({ s }: { s: StudentRow }) {
   return <span className={`font-bold tnum ${d >= 14 ? 'text-bad' : d >= 7 ? 'text-brand' : ''}`}>{d} d</span>;
 }
 
-export function LastSeen() {
-  return <span className="text-ink-soft" title="Heartbeat isn’t connected yet">–</span>;
+/** Latest Heartbeat login: amber from a week, red from two. */
+export function LastSeen({ s }: { s: StudentRow }) {
+  if (!s.heartbeatLinked) return <span className="text-xs text-ink-soft" title="Not matched to a Heartbeat member: add their email in the roster">not linked</span>;
+  if (!s.lastSeen) return <span className="text-ink-soft">never</span>;
+  const d = s.lastSeenDays ?? 0;
+  return <span className={`font-bold tnum ${d >= 14 ? 'text-bad' : d >= 7 ? 'text-brand' : ''}`}>{relative(s.lastSeen)}</span>;
 }
 
 /** Last note's age; hovering shows the note itself. */

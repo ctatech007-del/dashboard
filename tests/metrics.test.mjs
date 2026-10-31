@@ -407,3 +407,16 @@ test('handle change requests: validated, matched to the student, one at a time',
   const r = await one(`select old_handle, new_handle from rename_requests where id = $1`, [first.id]);
   assert.deepEqual(r, { old_handle: 'ren_old', new_handle: 'ren_new' });
 });
+
+test('views stamps count only Reels posted after joining', async () => {
+  const s = await student('VJ', 'views_join', 'Hub', '2026-11-10');
+  await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url, final_views, views_final_at)
+    values ($1, 'old_hit', 'reel', $2, 'u', 500000, $3)`, [s, ist('2026-11-01 10:00'), ist('2026-11-08 10:00')]);
+  await db.exec(`select award_stamps()`);
+  assert.ok(!(await stampsOf(s)).some((x) => ['hidden_gem', 'landmark'].includes(x.stamp)));
+  await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url, final_views, views_final_at)
+    values ($1, 'new_hit', 'reel', $2, 'u', 20000, $3)`, [s, ist('2026-11-11 10:00'), ist('2026-11-18 10:00')]);
+  await db.exec(`select award_stamps()`);
+  const got = (await stampsOf(s)).map((x) => x.stamp);
+  assert.ok(got.includes('hidden_gem') && !got.includes('landmark'));
+});
