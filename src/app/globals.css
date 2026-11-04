@@ -151,3 +151,127 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ───────────────────────── Student Hub ─────────────────────────
+   Public pages for students. Follows the system theme like the client's prototype, and plays
+   like a game: things pop in, stamps slam down, the next reward glows. */
+:root:has(.hub) {
+  --hub-card: #fbf5ec;
+  --hub-line: #eadcc8;
+  --hub-navy: #24345e;
+  --hub-sheen: rgba(255, 255, 255, 0.55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:has(.hub) {
+    color-scheme: dark;
+    --ink: #f3e9dc;
+    --ink-soft: #b3a291;
+    --paper: #221a15;
+    --surface: #2d241e;
+    --rule: #3e322a;
+    --brand-soft: #4a2f1c;
+    --good: #5cc07f;
+    --good-soft: #1f3a29;
+    --bad: #ef7a72;
+    --bad-soft: #43231f;
+    --hub-card: #2d241e;
+    --hub-line: #3e322a;
+    --hub-navy: #2c3e70;
+    --hub-sheen: rgba(255, 255, 255, 0.12);
+  }
+}
+.hub { font-family: var(--font-outfit), var(--font-nunito), system-ui, sans-serif; }
+.hub .card { background: var(--hub-card); border-color: var(--hub-line); box-shadow: 0 18px 40px -28px rgba(43, 33, 25, 0.45); }
+
+/* Gold / silver / bronze coins with a little depth */
+.coin { display: grid; place-items: center; border-radius: 999px; color: #fff; font-weight: 800;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18), inset 0 2px 0 rgba(255, 255, 255, 0.35); }
+.coin-1 { background: radial-gradient(circle at 35% 30%, #f6cf62, #dfa52a 65%); }
+.coin-2 { background: radial-gradient(circle at 35% 30%, #d9d6d2, #a6a19a 65%); }
+.coin-3 { background: radial-gradient(circle at 35% 30%, #df9a62, #b56f37 65%); }
+.coin-n { background: var(--paper); color: var(--ink-soft); box-shadow: none; }
+
+/* Light sweeping across a gold surface */
+.shine { position: relative; overflow: hidden; }
+.shine::after { content: ""; position: absolute; inset: 0; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 35%, var(--hub-sheen) 50%, transparent 65%);
+  animation: shine 4.5s ease-in-out 1.2s infinite; }
+@keyframes shine { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+
+.pop { animation: pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes pop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.rise { animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes rise { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Podium blocks grow up from the floor */
+.grow { transform-origin: bottom; animation: grow 0.8s cubic-bezier(0.2, 0.9, 0.25, 1.15) both; }
+@keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* A stamp hitting the page */
+.slam { animation: slam 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+@keyframes slam { 0% { transform: scale(1.8); opacity: 0; } 70% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+/* "You are here" on the 100 Post grid */
+.here { animation: here 1.8s ease-out infinite; }
+@keyframes here { 0% { box-shadow: 0 0 0 0 rgba(239, 124, 34, 0.65); } 100% { box-shadow: 0 0 0 14px rgba(239, 124, 34, 0); } }
+
+.bob { animation: bob 2.4s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-3px) rotate(-4deg); } }
+
+.wiggle:hover { animation: wiggle 0.5s ease-in-out; }
+@keyframes wiggle { 25% { transform: rotate(-9deg) scale(1.08); } 75% { transform: rotate(9deg) scale(1.08); } }
+
+/* Glow around the trophy and the next reward */
+.glow { box-shadow: 0 0 0 3px #e3a92b, 0 0 22px 4px rgba(227, 169, 43, 0.55); }
+
+/* Passport paper: fine wavy security lines */
+.guilloche {
+  background-color: #f5ecdc;
+  background-image:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.55), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='24'%3E%3Cpath d='M0 12 C 20 2, 40 2, 60 12 S 100 22, 120 12' fill='none' stroke='%23d9ccb6' stroke-width='0.8'/%3E%3Cpath d='M0 6 C 20 -4, 40 -4, 60 6 S 100 16, 120 6' fill='none' stroke='%23e2d7c4' stroke-width='0.6'/%3E%3C/svg%3E");
+  color: #2b2119;
+}
+/* Navy cover cloth */
+.cover {
+  background-color: var(--hub-navy);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1.2px);
+  background-size: 5px 5px;
+}
+/* Hologram on the photo */
+.holo { background: linear-gradient(125deg, #d8d2c4 0%, #e6d3d6 30%, #cfe0e2 50%, #ead8c6 70%, #d6cdbd 100%); }
+
+/* Arcade lettering and chunky game buttons */
+.pixel { font-family: var(--font-pixel), monospace; letter-spacing: 0.02em; line-height: 1.6; }
+.arcade { box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28); transition: transform 0.08s, box-shadow 0.08s; }
+.arcade:hover { transform: translateY(-1px); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.28); }
+.arcade:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.28); }
+.title-pop { text-shadow: 3px 3px 0 var(--brand-soft); }
+
+/* Clouds drifting across the sky behind the Hub */
+.drift { animation: drift linear infinite; }
+@keyframes drift { from { transform: translateX(-30vw); } to { transform: translateX(130vw); } }
+
+/* "?" block on the next post: hops like a 2000s platformer */
+.hop { animation: hop 1.4s ease-in-out infinite; }
+@keyframes hop { 0%, 60%, 100% { transform: translateY(0); } 70% { transform: translateY(-6px); } 80% { transform: translateY(0); } 88% { transform: translateY(-2px); } }
+
+/* "+1" when you hover a collected post */
+.plus1 { position: relative; }
+.plus1::after { content: "+1"; position: absolute; left: 50%; top: -2px; transform: translate(-50%, 0);
+  font: 700 10px var(--font-pixel), monospace; color: #e3a92b; opacity: 0; pointer-events: none;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35); }
+.plus1:hover::after { animation: plus1 0.7s ease-out; }
+@keyframes plus1 { 0% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -22px); } }
+
+/* Coins spin once as they appear */
+.spin-in { animation: spin-in 0.6s ease-out both; }
+@keyframes spin-in { from { transform: rotateY(90deg) scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Confetti (see hub-fx.tsx) */
+.confetti { position: fixed; top: -12px; width: 8px; height: 12px; border-radius: 2px; pointer-events: none; z-index: 60;
+  animation: confetti linear forwards; }
+@keyframes confetti { to { transform: translate3d(var(--dx), 110vh, 0) rotate(var(--r)); } }
+
+.hub .sticky-tabs { backdrop-filter: blur(8px); }

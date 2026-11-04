@@ -367,6 +367,17 @@ test('hub lookup: exact current or old handle only; students who left are hidden
   assert.equal(await find('look_up'), null);
 });
 
+test('hub search suggestions: close active handles only, never for very short input', async () => {
+  await student('Lost', 'lostleblanc', 'Hub', '2026-10-01');
+  await student('Gone', 'lostandgone', 'Hub', '2026-10-01');
+  const gone = await student('Left', 'lostleft', 'Hub', '2026-10-01');
+  await db.query(`update students set status = 'left' where id = $1`, [gone]);
+  const suggest = async (h) => (await one(`select hub_suggest($1) j`, [h])).j;
+  assert.deepEqual(await suggest('ostleblanc'), ['lostleblanc']);
+  assert.deepEqual(await suggest('@lost'), ['lostandgone', 'lostleblanc']);
+  assert.deepEqual(await suggest('lo'), []);
+});
+
 test('hub boards: growth top 3 with rank change, viral NEW tag, ties with +N', async () => {
   const ids = [];
   for (const h of ['bd_a', 'bd_b', 'bd_c', 'bd_d', 'bd_e', 'bd_f', 'bd_g']) ids.push(await student(h, h, 'Board', '2026-10-01'));

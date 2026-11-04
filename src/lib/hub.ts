@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 export interface HubStudent {
   name: string; handle: string; member_since: string; total_posts: number; month_posts: number;
+  month_rank: number | null; players: number;
   stamps: { stamp: string; earned_at: string; earned_month: string }[];
   rewards: { step: number; reached_at: string }[];
   updated_at: string | null;
@@ -33,4 +34,11 @@ export async function hubLookup(handle: string): Promise<string | null> {
   const db = await supabase();
   const { data } = await db.rpc('hub_lookup', { h: handle });
   return (data as string | null) ?? null;
+}
+
+/** Close matches for a handle that wasn't found ("did you mean"). */
+export async function hubSuggest(handle: string): Promise<string[]> {
+  const db = await supabase();
+  const { data } = await db.rpc('hub_suggest', { h: handle });
+  return (data as string[] | null) ?? [];
 }
