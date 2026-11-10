@@ -12,8 +12,8 @@ export default async function SetPassword() {
   if (!data.user) redirect('/login?error=link');
 
   return (
-    <main className="min-h-screen grid place-items-center px-6">
-      <div className="w-full max-w-sm">
+    <main className="sky min-h-screen grid place-items-center px-6 py-10 overflow-hidden">
+      <div className="sheet relative z-10 w-full max-w-sm rounded-3xl p-7 sm:p-9 overflow-hidden">
         <Star className="size-16 text-brand mb-6" />
         <h1 className="display text-4xl">Choose a password</h1>
         <p className="text-ink-soft mt-1 mb-8">For {data.user.email}. At least 8 characters.</p>

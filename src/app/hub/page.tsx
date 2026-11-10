@@ -22,19 +22,17 @@ function New() {
   return <span className="text-[10px] font-extrabold tracking-wide rounded-md px-1.5 py-0.5 bg-brand text-white">NEW</span>;
 }
 
-function Board({ title, sub, icon, children }: { title: string; sub: string; icon: string; children: React.ReactNode }) {
+function Board({ title, sub, icon, wide = false, children }: { title: string; sub: string; icon: string; wide?: boolean; children: React.ReactNode }) {
   return (
-    <section className="card relative overflow-hidden p-5 sm:p-6 rise">
-      <span aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-brand" />
-      <span aria-hidden className="absolute right-4 top-5 grid place-items-center size-10 rounded-full bg-brand-soft text-xl wiggle">{icon}</span>
-      <h3 className="display text-2xl sm:text-3xl">{title}</h3>
-      <p className="text-sm text-ink-soft">{sub}</p>
+    <section className="card relative overflow-hidden !bg-[#fffdf9] p-5 sm:p-7 rise">
+      <span aria-hidden className="absolute right-5 top-5 grid place-items-center size-11 sm:size-14 rounded-full bg-[#fff6ee] text-xl sm:text-2xl shadow-[0_6px_18px_-6px_rgba(200,90,20,0.35)] wiggle">{icon}</span>
+      <h3 className={`display pr-14 ${wide ? 'text-3xl sm:text-[2.6rem]' : 'text-2xl sm:text-[1.9rem]'}`}>{title}</h3>
+      <p className="mt-1 text-sm text-ink-soft">{sub}</p>
       {children}
     </section>
   );
 }
 
-const PLACE = ['1ST', '2ND', '3RD'];
 const MEDAL = ['🥇', '🥈', '🥉'];
 const BLOCK = ['coin-1', 'coin-2', 'coin-3'];
 
@@ -104,30 +102,29 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
         <h2 className="display on-sky text-5xl sm:text-6xl mt-1">Leaderboards</h2>
       </div>
 
-      <Board title="Follower Growth" sub={`${month} · ${countdown}`} icon="🚀">
+      <Board title="Follower Growth" sub={`${month} · ${countdown}`} icon="🚀" wide>
         {b.follower_growth.length ? (
-          <ol className="mt-6 grid grid-cols-3 items-end gap-2 sm:gap-4 text-center">
+          <ol className="mt-8 grid grid-cols-3 items-end gap-2 sm:gap-5 text-center">
             {podium.map((g, i) => {
               const place = [2, 1, 3][i];
               return (
                 <li key={place} className="min-w-0 flex flex-col">
                   {g && (
                     <div className="pop" style={{ animationDelay: `${[350, 600, 150][i]}ms` }}>
-                      {place === 1 && <p aria-hidden className="text-2xl -mb-1 bob">👑</p>}
                       <span className="relative inline-block">
-                        <Coin rank={place} className={place === 1 ? 'size-16 text-2xl' : 'size-12 text-lg'} />
-                        {place === 1 && <><span aria-hidden className="absolute -left-4 top-1 text-gold text-sm bob">✦</span><span aria-hidden className="absolute -right-3 bottom-0 text-gold text-xs">✦</span></>}
+                        {place === 1 && <span aria-hidden className="absolute left-1/2 -top-5 sm:-top-6 -translate-x-1/2 text-2xl sm:text-3xl bob">👑</span>}
+                        <Coin rank={place} className={place === 1 ? 'size-16 sm:size-24 text-2xl sm:text-4xl' : 'size-12 sm:size-[4.5rem] text-lg sm:text-3xl'} />
+                        {place === 1 && <><span aria-hidden className="absolute -left-5 top-4 text-gold text-sm bob">✦</span><span aria-hidden className="absolute -right-4 bottom-2 text-gold text-sm">✦</span></>}
                       </span>
-                      <p className="mt-2 text-sm sm:text-base font-bold truncate"><Who handle={g.ig_handle} /></p>
-                      <p className="text-xl sm:text-2xl font-extrabold text-good tnum">+<CountUp to={g.value} /></p>
-                      <p className="text-xs text-ink-soft">followers</p>
-                      <p className="mt-1.5 mb-3"><Move rank={g.rank} prev={g.prev_rank} /></p>
+                      <p className="mt-3 text-sm sm:text-lg font-bold truncate"><Who handle={g.ig_handle} /></p>
+                      <p className="text-xl sm:text-3xl font-extrabold text-good tnum">+<CountUp to={g.value} /></p>
+                      <p className="text-xs sm:text-sm text-ink-soft">followers</p>
+                      <p className="mt-2 mb-4"><Move rank={g.rank} prev={g.prev_rank} /></p>
                     </div>
                   )}
                   <div aria-hidden style={{ animationDelay: `${[200, 0, 400][i]}ms` }}
-                    className={`grow ${place === 1 ? 'shine' : ''} ${BLOCK[place - 1]} rounded-t-xl rounded-b-none flex flex-col items-center justify-start pt-3 gap-1 shadow-none ${['h-24', 'h-32', 'h-20'][i]}`}>
-                    <span className="text-2xl sm:text-3xl drop-shadow">{MEDAL[place - 1]}</span>
-                    <span className="text-[10px] sm:text-xs font-extrabold tracking-[0.12em] text-white/90">{PLACE[place - 1]}</span>
+                    className={`grow ${place === 1 ? 'shine' : ''} ${BLOCK[place - 1]} rounded-t-[1.25rem] sm:rounded-t-[2rem] flex justify-center pt-4 sm:pt-6 ${['h-24 sm:h-28', 'h-32 sm:h-36', 'h-20 sm:h-[5.5rem]'][i]}`}>
+                    <span className="text-2xl sm:text-4xl drop-shadow">{MEDAL[place - 1]}</span>
                   </div>
                 </li>
               );
@@ -185,3 +182,4 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
     </>
   );
 }
+

@@ -29,11 +29,11 @@ export function NavLinks({ attention }: { attention: number }) {
         href={i.href}
         aria-current={active ? 'page' : undefined}
         className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-bold whitespace-nowrap ${
-          active ? 'bg-brand text-white' : 'text-ink hover:bg-paper'}`}
+          active ? 'bg-brand text-white shadow' : 'text-white/85 hover:bg-white/10 hover:text-white'}`}
       >
         {i.label}
         {'badge' in i && attention > 0 && (
-          <span className={`tnum text-xs rounded-full px-1.5 min-w-5 text-center ${active ? 'bg-white text-brand' : 'bg-bad text-white'}`}>
+          <span className={`tnum text-xs rounded-full px-1.5 min-w-5 text-center ${active ? 'bg-white text-brand' : 'bg-[#e8584f] text-white'}`}>
             {attention}
           </span>
         )}
@@ -43,10 +43,10 @@ export function NavLinks({ attention }: { attention: number }) {
   return (
     <nav aria-label="Main" className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
       {MAIN.map(item)}
-      <hr className="hidden md:block border-rule my-3" />
+      <hr className="hidden md:block border-white/15 my-3" />
       {TOOLS.map(item)}
       <a href="/hub" target="_blank" rel="noreferrer"
-        className="rounded-lg px-3 py-2 text-sm font-bold whitespace-nowrap text-brand hover:bg-paper">Student Hub ↗</a>
+        className="rounded-lg px-3 py-2 text-sm font-bold whitespace-nowrap text-[#f2c45a] hover:bg-white/10">Student Hub ↗</a>
     </nav>
   );
 }

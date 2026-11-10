@@ -6,11 +6,11 @@ import { Star } from '@/components/star';
 export default async function Login({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
   return (
-    <main className="min-h-screen grid place-items-center px-6 py-10 overflow-hidden">
-      <div className="w-full max-w-sm relative">
-        <Star className="size-56 text-brand -ml-6 mb-2" rays={12} />
-        <Star className="absolute size-28 text-ink/80 top-6 right-0" rays={8} />
-        <h1 className="display text-6xl leading-[0.95]">Student Stats</h1>
+    <main className="sky min-h-screen grid place-items-center px-6 py-10 overflow-hidden">
+      <div className="sheet relative z-10 w-full max-w-sm rounded-3xl p-7 sm:p-9 overflow-hidden">
+        <Star className="size-40 text-brand -ml-4 mb-2" rays={12} />
+        <Star className="absolute size-20 text-ink/80 top-10 right-8" rays={8} />
+        <h1 className="display text-5xl leading-[1]">Student Stats</h1>
         <p className="text-ink-soft mt-3 mb-8">Creator Takeoff Academy · team sign-in. Ask an admin for an invite if you don’t have an account.</p>
         {error === 'link' && (
           <p role="alert" className="text-sm text-flag bg-flag-soft rounded-md px-3 py-2 mb-6">

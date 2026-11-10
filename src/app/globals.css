@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-/* Warm paper and orange, from the client's prototype (docs/brief-2026-10.md). Light only. */
+/* Warm paper and orange from the client's prototypes; since 10 Nov both Student Stats and the Hub
+   share the Hub redesign: grainy orange-to-gold sky, serif headings, cream cards. Light only. */
 :root {
   color-scheme: light;
   --ink: #2b2119;
@@ -56,8 +57,8 @@
   --color-pink: var(--pink);
   --color-green: var(--green);
   --color-blue: var(--blue);
-  --font-sans: var(--font-nunito);
-  --font-display: var(--font-caveat);
+  --font-sans: var(--font-outfit);
+  --font-display: var(--font-serif);
   --radius-md: 0.6rem;
   --radius-lg: 0.9rem;
 }
@@ -65,15 +66,15 @@
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-nunito), system-ui, sans-serif;
+  font-family: var(--font-outfit), system-ui, sans-serif;
 }
 
-/* Hand-lettered headings, as in the prototype */
+/* Serif headings, as in the client's redesign */
 .display {
-  font-family: var(--font-caveat), var(--font-nunito), cursive;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 1.05;
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.08;
 }
 /* Kept for older markup: bold numbers and headings in the body font */
 .wide { font-weight: 800; }
@@ -160,9 +161,8 @@ body {
   --hub-card: #fbf5ec;
   --hub-line: #eadcc8;
   --hub-navy: #24345e;
-  --hub-sheen: rgba(255, 255, 255, 0.55);
+  --hub-sheen: rgba(255, 255, 255, 0.7);
 }
-.hub { font-family: var(--font-outfit), var(--font-nunito), system-ui, sans-serif; }
 .hub .card { background: var(--hub-card); border-color: var(--hub-line); box-shadow: 0 18px 40px -28px rgba(43, 33, 25, 0.45); }
 
 /* Gold / silver / bronze coins with a little depth */
@@ -176,8 +176,8 @@ body {
 /* Light sweeping across a gold surface */
 .shine { position: relative; overflow: hidden; }
 .shine::after { content: ""; position: absolute; inset: 0; transform: translateX(-120%);
-  background: linear-gradient(105deg, transparent 35%, var(--hub-sheen) 50%, transparent 65%);
-  animation: shine 4.5s ease-in-out 1.2s infinite; }
+  background: linear-gradient(105deg, transparent 30%, var(--hub-sheen) 50%, transparent 70%);
+  animation: shine 3.2s ease-in-out 1s infinite; }
 @keyframes shine { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
 
 .pop { animation: pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
@@ -227,8 +227,8 @@ body {
 @keyframes confetti { to { transform: translate3d(var(--dx), 110vh, 0) rotate(var(--r)); } }
 
 
-/* The Hub sky: warm blurred gradient with film grain */
-.hub-sky {
+/* The sky behind every page: warm blurred gradient with film grain */
+.sky {
   background-color: #e48a3a;
   background-image:
     radial-gradient(60% 50% at 12% 8%, #e5652a 0%, transparent 70%),
@@ -238,12 +238,11 @@ body {
     linear-gradient(160deg, #e7782f 0%, #eaa23c 45%, #d9b144 70%, #8b8a3e 100%);
   background-attachment: fixed;
 }
-.hub-sky::before {
+.sky::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.22; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-.hub .display { font-family: var(--font-serif), Georgia, serif; font-weight: 600; letter-spacing: -0.01em; line-height: 1.08; }
-.hub .on-sky { color: #fff; text-shadow: 0 2px 14px rgba(120, 50, 0, 0.25); }
+.on-sky { color: #fff; text-shadow: 0 2px 14px rgba(120, 50, 0, 0.25); }
 /* Translucent pills on the sky */
 .glass { background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.45); backdrop-filter: blur(6px); }
 
@@ -275,3 +274,8 @@ body {
 /* Bars that fill from 0 each time the page opens */
 .grow-x { transform-origin: left; animation: grow-x 1.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s both; }
 @keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Student Stats on the sky: navy sidebar, content on a cream sheet, white cards */
+.sheet { background: #faf5ec; border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 30px 70px -40px rgba(80, 35, 0, 0.55); }
+.sheet .card { background: #fffdf9; box-shadow: 0 10px 28px -22px rgba(43, 33, 25, 0.5); }
+.navy-glass { background: rgba(31, 45, 87, 0.93); border: 1px solid rgba(255, 255, 255, 0.14); backdrop-filter: blur(8px); }
