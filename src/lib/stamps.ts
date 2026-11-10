@@ -1,5 +1,6 @@
-// The 22 Passport stamps. Names and texts must match the brief word for word
-// (docs/brief-2026-10.md); keys match award_stamps() in the database.
+// The 22 Passport stamps. Names and texts follow the client's rules (docs/feedback-2026-11-10.md,
+// which renamed Trailblazer → Pioneer and Economy Premium → Economy Plus); keys match
+// award_stamps() in the database and never change.
 
 export type StampShape = 'rect' | 'circle' | 'oval' | 'octagon' | 'ticket' | 'seal';
 
@@ -24,9 +25,9 @@ export const STAMPS: StampDef[] = [
   { key: 'explorer', name: 'Explorer', text: '5K followers', shape: 'circle', ink: BLUE, big: '5K', group: 2 },
   { key: 'nomad', name: 'Nomad', text: '10K followers', shape: 'circle', ink: BLUE, big: '10K', group: 2 },
   { key: 'globetrotter', name: 'Globetrotter', text: '25K followers', shape: 'circle', ink: BLUE, big: '25K', group: 2 },
-  { key: 'trailblazer', name: 'Trailblazer', text: '50K followers', shape: 'circle', ink: BLUE, big: '50K', group: 2 },
+  { key: 'trailblazer', name: 'Pioneer', text: '50K followers', shape: 'circle', ink: BLUE, big: '50K', group: 2 },
   { key: 'legend', name: 'Legend', text: '100K followers', shape: 'circle', ink: BLUE, big: '100K', group: 2 },
-  { key: 'economy_premium', name: 'Economy Premium', text: '+100 followers in one month', shape: 'rect', ink: GREEN, big: '+100', group: 3 },
+  { key: 'economy_premium', name: 'Economy Plus', text: '+100 followers in one month', shape: 'rect', ink: GREEN, big: '+100', group: 3 },
   { key: 'business_class', name: 'Business Class', text: '+1K followers in one month', shape: 'rect', ink: GREEN, big: '+1K', group: 3 },
   { key: 'first_class', name: 'First Class', text: '+10K followers in one month', shape: 'rect', ink: GREEN, big: '+10K', group: 3 },
   { key: 'hidden_gem', name: 'Hidden Gem', text: '10K views on one post', shape: 'octagon', ink: RED, big: '10K', group: 4 },
@@ -40,20 +41,63 @@ export const STAMPS: StampDef[] = [
 
 export const STAMP = new Map(STAMPS.map((s) => [s.key, s]));
 
+/** Rows of "Stamps you can collect", always in this order (docs/feedback-2026-11-10.md). */
+export const COLLECT_ROWS: string[][] = [
+  ['takeoff', 'silver_wings', 'golden_wings', 'co_pilot', 'captain', 'first_captain'],
+  ['wanderer', 'explorer', 'nomad', 'globetrotter', 'trailblazer', 'legend'],
+  ['economy_premium', 'business_class', 'first_class', 'hidden_gem', 'landmark', 'wonder_of_the_world'],
+  ['boarding_pass', 'jet_setter', 'frequent_flyer', 'around_the_world'],
+];
+
 export const REWARD_STEPS = [10, 15, 30, 35, 50, 55, 70, 75, 90, 95, 100];
 
-/** Passport machine-readable lines, e.g. "P<CRT<BOES<<JULIAN<<<…". 44 characters each, like a real one. */
-export function mrz(name: string, handle: string, memberSince: string, stamps: number): [string, string] {
+/**
+ * Passport machine-readable lines, 44 characters each, as the client specified:
+ * "P<CRT<<JULIAN<BOES<<<…" and "11<22<<FEB2026<<CREATOR<TAKEOFF<ACADEMY<<<…".
+ */
+export function mrz(name: string, memberSince: string, stamps: number): [string, string] {
   const clean = (s: string) => s.normalize('NFKD').replace(/[^A-Za-z0-9 ]/g, '').toUpperCase().trim();
-  const parts = clean(name).split(/\s+/).filter(Boolean);
-  const last = parts.length > 1 ? parts[parts.length - 1] : parts[0] ?? '';
-  const given = parts.length > 1 ? parts.slice(0, -1).join('<') : '';
   const pad = (s: string) => (s + '<'.repeat(44)).slice(0, 44);
-  const since = memberSince.slice(2, 7).replace('-', '');   // 2026-02-01 → 2602
+  const since = new Date(`${memberSince.slice(0, 10)}T00:00:00Z`)
+    .toLocaleDateString('en-GB', { timeZone: 'UTC', month: 'short', year: 'numeric' }).replace(' ', '').toUpperCase();
   return [
-    pad(`P<CRT<${last}<<${given}`),
-    pad(`${clean(handle).replace(/ /g, '<')}<<CTA${since}<<${String(stamps).padStart(2, '0')}${STAMPS.length}`),
+    pad(`P<CRT<<${clean(name).split(/\s+/).filter(Boolean).join('<')}`),
+    pad(`${stamps}<${STAMPS.length}<<${since}<<CREATOR<TAKEOFF<ACADEMY`),
   ];
+}
+
+export const STAMPS_PER_PAGE = 5;
+
+/** Earned stamps split into visa pages of five, oldest first. */
+export function visaPages<T>(earned: T[]): T[][] {
+  const pages: T[][] = [];
+  for (let i = 0; i < earned.length; i += STAMPS_PER_PAGE) pages.push(earned.slice(i, i + STAMPS_PER_PAGE));
+  return pages.length ? pages : [[]];
+}
+
+/** Stable pseudo-random number in [0, 1) from a string (same member → same stamp layout). */
+export function seeded(key: string) {
+  let h = 2166136261;
+  for (const c of key) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return ((h >>> 0) % 100000) / 100000;
+}
+
+// Six positions per page in a loose 2 × 3 grid (left %, top %).
+const SLOTS = [[4, 4], [52, 2], [6, 35], [52, 34], [4, 66], [52, 65]];
+
+/**
+ * Where a stamp lands on its page: one of the six slots (in order, so Takeoff is always top left
+ * of page 2), nudged off-grid, tilted up to ±17° and with slightly varying ink. Stable per member.
+ */
+export function placement(handle: string, stamp: string, index: number) {
+  const r = (salt: string) => seeded(`${handle}:${stamp}:${salt}`);
+  const [l, t] = SLOTS[index % SLOTS.length];
+  return {
+    left: l + (r('x') - 0.5) * 6,
+    top: t + (r('y') - 0.5) * 5,
+    tilt: Math.round((r('t') - 0.5) * 34),
+    ink: 0.72 + r('i') * 0.24,
+  };
 }
 
 /** Small stable number from a string, for each stamp's tilt. */

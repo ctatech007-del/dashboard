@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { hubBoards, hubSuggest } from '@/lib/hub';
 import { istToday, monthLabel, monthStart, resetCountdown } from '@/lib/period';
 import { compact } from '@/components/ui';
-import { Coin, GridIcon, HubTitle, PassportIcon, Plane, Stamp, Updated } from '@/components/hub';
+import { Coin, GridIcon, HubTitle, InstaHandle as Who, PassportIcon, Plane, Stamp, Updated } from '@/components/hub';
 import { CountUp } from '@/components/hub-fx';
 import { STAMP } from '@/lib/stamps';
 
@@ -19,12 +19,7 @@ function Move({ rank, prev }: { rank: number; prev: number | null }) {
 }
 
 function New() {
-  return <span className="pixel text-[7px] rounded-md px-1.5 py-1 bg-brand text-white shadow-[0_2px_0_#b9560f]">NEW</span>;
-}
-
-/** A student's handle that opens their 100 Post page. */
-function Who({ handle, className = '' }: { handle: string; className?: string }) {
-  return <Link href={`/hub/${handle}`} className={`hover:text-brand hover:underline underline-offset-2 ${className}`}>@{handle}</Link>;
+  return <span className="text-[10px] font-extrabold tracking-wide rounded-md px-1.5 py-0.5 bg-brand text-white">NEW</span>;
 }
 
 function Board({ title, sub, icon, children }: { title: string; sub: string; icon: string; children: React.ReactNode }) {
@@ -32,7 +27,7 @@ function Board({ title, sub, icon, children }: { title: string; sub: string; ico
     <section className="card relative overflow-hidden p-5 sm:p-6 rise">
       <span aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-brand" />
       <span aria-hidden className="absolute right-4 top-5 grid place-items-center size-10 rounded-full bg-brand-soft text-xl wiggle">{icon}</span>
-      <h3 className="display text-3xl sm:text-4xl">{title}</h3>
+      <h3 className="display text-2xl sm:text-3xl">{title}</h3>
       <p className="text-sm text-ink-soft">{sub}</p>
       {children}
     </section>
@@ -55,7 +50,7 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
       <HubTitle>CTA Challenge Hub</HubTitle>
 
       {/* Search: the orange "boarding gate" with faded stamps, as in the prototype */}
-      <section className="relative mt-7 overflow-hidden rounded-3xl bg-[radial-gradient(120%_140%_at_30%_0%,#f9a24f_0%,#f08a2e_45%,#e7701a_100%)] px-5 py-10 sm:py-12 text-center text-white shadow-[0_24px_50px_-24px_rgba(234,111,23,0.8)] rise">
+      <section className="relative mt-7 overflow-hidden rounded-3xl bg-[linear-gradient(135deg,rgba(242,140,60,0.92),rgba(240,165,80,0.85))] border border-white/50 px-5 py-10 sm:py-12 text-center text-white shadow-[0_24px_50px_-24px_rgba(150,60,0,0.6)] rise">
         <div aria-hidden className="pointer-events-none absolute inset-0 text-white">
           <span className="absolute -left-10 -top-12 opacity-25">
             <Stamp def={{ ...STAMP.get('captain')!, name: 'Entry', text: 'CTA', big: '✈', ink: '#fff' }} month="2026-01-01" size={170} plain />
@@ -71,13 +66,13 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
           <span className="absolute right-[30%] bottom-14 text-xs opacity-60">✦</span>
         </div>
 
-        <p className="relative text-xs sm:text-sm font-bold tracking-[0.22em] uppercase">Search your name to open your</p>
+        <p className="relative text-xs sm:text-sm font-bold tracking-[0.22em] uppercase">Search your IG handle to open your</p>
         <p className="relative mt-3 flex flex-wrap justify-center items-center gap-3">
-          <span className="display text-3xl sm:text-5xl rounded-2xl bg-white text-brand px-4 py-1.5 flex items-center gap-2.5 shadow-[0_6px_0_rgba(150,60,0,0.25)] -rotate-1">
+          <span className="display text-2xl sm:text-[2.6rem] rounded-2xl bg-white text-brand px-4 py-1.5 flex items-center gap-2.5 shadow-[0_6px_0_rgba(150,60,0,0.25)] -rotate-1">
             <GridIcon className="size-6 sm:size-8" />100 Post Challenge
           </span>
-          <span className="display text-3xl sm:text-5xl">&amp;</span>
-          <span className="display text-3xl sm:text-5xl rounded-2xl bg-white text-brand px-4 py-1.5 flex items-center gap-2.5 shadow-[0_6px_0_rgba(150,60,0,0.25)] rotate-1">
+          <span className="display text-2xl sm:text-[2.6rem]">&amp;</span>
+          <span className="display text-2xl sm:text-[2.6rem] rounded-2xl bg-white text-brand px-4 py-1.5 flex items-center gap-2.5 shadow-[0_6px_0_rgba(150,60,0,0.25)] rotate-1">
             <PassportIcon className="size-6 sm:size-8" />Passport
           </span>
         </p>
@@ -105,8 +100,8 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
       </section>
 
       <div className="mt-12 mb-5 text-center">
-        <p className="pixel text-[9px] sm:text-[10px] text-brand">★ {month.toUpperCase()} HIGH SCORES ★</p>
-        <h2 className="display title-pop text-5xl mt-1">Leaderboards</h2>
+        <p className="on-sky text-xs font-bold tracking-[0.22em] uppercase">★ {month} high scores ★</p>
+        <h2 className="display on-sky text-5xl sm:text-6xl mt-1">Leaderboards</h2>
       </div>
 
       <Board title="Follower Growth" sub={`${month} · ${countdown}`} icon="🚀">
@@ -132,7 +127,7 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
                   <div aria-hidden style={{ animationDelay: `${[200, 0, 400][i]}ms` }}
                     className={`grow ${place === 1 ? 'shine' : ''} ${BLOCK[place - 1]} rounded-t-xl rounded-b-none flex flex-col items-center justify-start pt-3 gap-1 shadow-none ${['h-24', 'h-32', 'h-20'][i]}`}>
                     <span className="text-2xl sm:text-3xl drop-shadow">{MEDAL[place - 1]}</span>
-                    <span className="pixel text-[8px] sm:text-[9px] text-white/90">{PLACE[place - 1]}</span>
+                    <span className="text-[10px] sm:text-xs font-extrabold tracking-[0.12em] text-white/90">{PLACE[place - 1]}</span>
                   </div>
                 </li>
               );

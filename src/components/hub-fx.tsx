@@ -25,7 +25,7 @@ export function CountUp({ to, ms = 900 }: { to: number; ms?: number }) {
 
 const COLORS = ['#ef7c22', '#e3a92b', '#2f8f52', '#4a6fb5', '#c2524a', '#8466b8'];
 
-function burst() {
+export function burst() {
   if (still()) return;
   for (let i = 0; i < 90; i++) {
     const el = document.createElement('span');

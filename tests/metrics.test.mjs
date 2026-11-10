@@ -340,6 +340,22 @@ test('stamps: each family is earned once with its month, and never taken away', 
   assert.equal((await stampsOf(s)).length, 10);
 });
 
+test('a new member gets Takeoff on joining, first, and follower stamps they already have', async () => {
+  const s = await student('Big Joiner', 'big_joiner', 'Hub', '2026-10-30');
+  // Takeoff comes from the insert itself, before any daily run
+  assert.deepEqual(await stampsOf(s), [{ stamp: 'takeoff', m: '2026-10-01' }]);
+  await followers(s, '2026-10-31', 26000);   // first count, the morning after joining
+  await followers(s, '2026-11-20', 52000);   // passes 50K later
+  await db.exec(`select award_stamps()`);
+  const months = Object.fromEntries((await stampsOf(s)).map((x) => [x.stamp, x.m]));
+  assert.equal(months.wanderer, '2026-10-01');
+  assert.equal(months.globetrotter, '2026-10-01');
+  assert.equal(months.trailblazer, '2026-11-01');
+  const hub = (await one(`select hub_student('big_joiner') j`)).j;
+  assert.equal(hub.stamps[0].stamp, 'takeoff');
+  assert.equal(hub.member_since, '2026-10-30');
+});
+
 test('frequent flyer needs 10+ posts in three consecutive months', async () => {
   const s = await student('FF', 'freq_flyer', 'Hub', '2026-08-01');
   for (const [m, n] of [['08', 10], ['09', 12], ['10', 9], ['11', 10]]) {
@@ -396,6 +412,11 @@ test('hub boards: growth top 3 with rank change, viral NEW tag, ties with +N', a
   const { rows: [vp] } = await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url)
     values ($1, 'bd_viral', 'reel', $2, 'https://www.instagram.com/p/bd_viral/') returning id`, [ids[3], ist('2026-11-23 10:00')]);
   await snap('2026-11-25', 'viral', 3, 1, 50000, ist('2026-11-23 10:00'), vp.id);
+  // An older post that first made the top 5 three days ago is no longer NEW
+  const { rows: [op] } = await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url)
+    values ($1, 'bd_old', 'reel', $2, 'u') returning id`, [ids[4], ist('2026-11-20 10:00')]);
+  await snap('2026-11-22', 'viral', 4, 1, 9000, ist('2026-11-20 10:00'), op.id);
+  await snap('2026-11-25', 'viral', 4, 2, 40000, ist('2026-11-20 10:00'), op.id);
 
   const b = (await one(`select hub_boards() j`)).j;
   assert.equal(b.day, '2026-11-25');
@@ -404,7 +425,11 @@ test('hub boards: growth top 3 with rank change, viral NEW tag, ties with +N', a
   assert.deepEqual(b.total_posts.map((t) => [t.ig_handle, t.rank]),
     [['bd_a', 1], ['bd_b', 2], ['bd_c', 2], ['bd_d', 2], ['bd_e', 2]]);
   assert.deepEqual(b.total_posts_tied, ['bd_f', 'bd_g']);
-  assert.deepEqual(b.viral.map((v) => [v.ig_handle, v.is_new, v.url]), [['bd_d', true, 'https://www.instagram.com/p/bd_viral/']]);
+  assert.deepEqual(b.viral.map((v) => [v.ig_handle, v.is_new, v.url]),
+    [['bd_d', true, 'https://www.instagram.com/p/bd_viral/'], ['bd_e', false, 'u']]);
+  // A post that first entered yesterday keeps its NEW tag today (48 hours)
+  await snap('2026-11-24', 'viral', 3, 3, 20000, ist('2026-11-23 10:00'), vp.id);
+  assert.equal((await one(`select hub_boards() j`)).j.viral[0].is_new, true);
 });
 
 test('handle change requests: validated, matched to the student, one at a time', async () => {
