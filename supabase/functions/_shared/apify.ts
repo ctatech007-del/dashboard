@@ -1,8 +1,9 @@
 // Pure helpers for turning Apify Instagram scraper items into rows.
 // No Deno/Node-specific imports, so this file is unit tested with Node (`npm test`).
 //
-// Field names follow apify/instagram-profile-scraper and apify/instagram-post-scraper output.
-// VERIFY against a real test run before go-live: Apify occasionally renames fields.
+// Field names follow apify/instagram-profile-scraper, -post-scraper and -reel-scraper output.
+// Since Nov 2026 the profile scraper no longer returns view counts, so Reel views come from the
+// reel scraper (a separate daily pass, see scrape-ingest). Apify occasionally renames fields.
 
 export type PostType = 'image' | 'carousel' | 'reel' | 'video';
 export type Outcome = 'ok' | 'private' | 'not_found' | 'error';
@@ -17,8 +18,9 @@ export interface RawPost {
   ownerUsername?: string;
   ownerId?: string;
   isPinned?: boolean;
-  videoViewCount?: number;  // Reels/videos only: Instagram has no public views for images
-  videoPlayCount?: number;
+  videoPlayCount?: number;  // Reels/videos only: what Instagram shows as "views" (plays)
+  videoViewCount?: number;  // older, lower count; used only when plays are missing
+  inputUrl?: string;        // reel scraper: the profile it was asked for
 }
 
 export interface RawProfile {
@@ -91,7 +93,7 @@ export function normalizePost(p: RawPost, handle?: string): NormalizedPost | nul
     post_type: type,
     posted_at: posted.toISOString(),
     url: p.url ?? `https://www.instagram.com/p/${p.shortCode}/`,
-    views: type === 'reel' || type === 'video' ? count(p.videoViewCount ?? p.videoPlayCount) : null,
+    views: type === 'reel' || type === 'video' ? count(p.videoPlayCount ?? p.videoViewCount) : null,
     is_collab: !!(handle && owner && owner !== handle),
     raw: p,
   };

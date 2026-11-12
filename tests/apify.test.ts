@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cleanHandle, missingHandles, parseProfile, postType,
+  cleanHandle, missingHandles, normalizePost, parseProfile, postType,
 } from '../supabase/functions/_shared/apify.ts';
 
 test('cleanHandle strips urls, @ and case', () => {
@@ -53,4 +53,11 @@ test('followers, reel views and collabs come through; images have no views', () 
   assert.deepEqual(r.posts.map((p) => [p.shortcode, p.views, p.is_collab]),
     [['r1', 1962, false], ['c1', null, false], ['x1', null, true]]);
   assert.equal(parseProfile({ username: 'a', private: true }, null).followers, null);
+});
+
+test('Reel views are the play count Instagram shows; the older view count is only a fallback', () => {
+  const reel = { shortCode: 'r2', type: 'Video', productType: 'clips', timestamp: '2026-11-20T10:00:00Z' };
+  assert.equal(normalizePost({ ...reel, videoPlayCount: 51000, videoViewCount: 12000 }, 'riya')?.views, 51000);
+  assert.equal(normalizePost({ ...reel, videoViewCount: 12000 }, 'riya')?.views, 12000);
+  assert.equal(normalizePost({ ...reel }, 'riya')?.views, null);
 });

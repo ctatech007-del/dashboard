@@ -1,5 +1,8 @@
-// Apify webhook target. phase=profiles → ingest profile results, maybe start overflow scrape.
-// phase=overflow → ingest extra posts. Both end in finalize(): metrics + Google Sheet sync.
+// Apify webhook target, in up to three passes per run:
+//   phase=profiles → ingest profiles; start the overflow pass if anyone posted more than 12 posts
+//   phase=overflow → ingest extra posts
+//   phase=views    → ingest Reel play counts (the profile scraper no longer returns views)
+// The last pass ends in finalize(): metrics, daily rollup, Google Sheet sync.
 import { authorized, datasetItems, db, errorText, fnUrl, json, startActor } from '../_shared/env.ts';
 import { alert } from '../_shared/alert.ts';
 import {
@@ -8,6 +11,8 @@ import {
 } from '../_shared/apify.ts';
 
 const POST_ACTOR = 'apify~instagram-post-scraper';
+const REEL_ACTOR = 'apify~instagram-reel-scraper';
+const VIEW_DAYS = 8;   // views are read daily until they're final on day 7
 
 interface Student {
   id: string; ig_handle: string; ig_user_id: string | null; start_date: string;
@@ -28,7 +33,14 @@ Deno.serve(async (req) => {
     if (phase === 'profiles') return json(await ingestProfiles(runId, succeeded ? resource : null));
     if (phase === 'overflow') {
       if (succeeded) await ingestOverflow(runId, resource.defaultDatasetId);
-      return json(await finalize(runId, succeeded ? null : 'Overflow scrape failed; counts may be short'));
+      const warning = succeeded ? null : 'Overflow scrape failed; counts may be short';
+      return json(await startViews(runId, warning) ?? await finalize(runId, warning));
+    }
+    if (phase === 'views') {
+      if (succeeded) await ingestOverflow(runId, resource.defaultDatasetId);
+      const warning = url.searchParams.get('warning')
+        ?? (succeeded ? null : 'Reel views could not be read today; Most Viral uses yesterday’s counts');
+      return json(await finalize(runId, warning));
     }
     return json({ error: 'bad phase' }, 400);
   } catch (e) {
@@ -127,9 +139,27 @@ async function ingestProfiles(runId: string, resource: { defaultDatasetId: strin
     }, fnUrl('scrape-ingest', { run: runId, phase: 'overflow' }));
     return { run: runId, profiles: items.length, overflow: overflow.length };
   }
-  return finalize(runId, null);
+  return await startViews(runId, null) ?? finalize(runId, null);
 }
 
+/**
+ * Reel play counts for the last VIEW_DAYS days, for everyone in this run. Returns null (go straight
+ * to finalize) when nobody is left to check. Trial Reels are skipped: they don't count.
+ */
+async function startViews(runId: string, warning: string | null) {
+  const students = await activeStudents(runId);
+  if (!students.length) return null;
+  const since = new Date(Date.now() - VIEW_DAYS * 864e5).toISOString().slice(0, 10);
+  await startActor(REEL_ACTOR, {
+    username: students.map((s) => s.ig_handle),
+    onlyPostsNewerThan: since,
+    resultsLimit: 30,
+    skipTrialReels: true,
+  }, fnUrl('scrape-ingest', { run: runId, phase: 'views', ...(warning ? { warning } : {}) }));
+  return { run: runId, views: students.length };
+}
+
+/** Extra posts (overflow pass) or Reels with today's play counts (views pass). */
 async function ingestOverflow(runId: string, datasetId: string) {
   const students = await activeStudents(runId);
   const byHandle = new Map(students.map((s) => [cleanHandle(s.ig_handle), s]));
@@ -137,7 +167,8 @@ async function ingestOverflow(runId: string, datasetId: string) {
 
   const grouped = new Map<string, NormalizedPost[]>();
   for (const item of items) {
-    const s = byHandle.get(cleanHandle(item.ownerUsername ?? ''));
+    // A collab Reel is owned by someone else: fall back to the profile it was found on.
+    const s = byHandle.get(cleanHandle(item.ownerUsername ?? '')) ?? byHandle.get(cleanHandle(item.inputUrl ?? ''));
     const post = normalizePost(item, s ? cleanHandle(s.ig_handle) : undefined);
     if (!s || !post) continue;
     grouped.set(s.id, [...(grouped.get(s.id) ?? []), post]);
