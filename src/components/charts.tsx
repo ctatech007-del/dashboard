@@ -25,7 +25,9 @@ export function ColumnChart({ data, format, height = 200, title, color = MARK, t
   color?: string; tint?: string; labelAll?: boolean;
 }) {
   const vals = data.map((d) => d.value ?? 0);
-  const ticks = niceTicks(Math.min(0, ...vals), Math.max(1, ...vals));
+  // Gridlines whose rounded label would repeat (0, 1, 1 on a small range) are dropped
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(1, ...vals))
+    .filter((t, i, all) => i === 0 || format(t) !== format(all[i - 1]));
   const lo = ticks[0], hi = ticks[ticks.length - 1];
   const H = height, ih = H - PAD.t - PAD.b, iw = W - PAD.l - PAD.r;
   const y = (v: number) => PAD.t + ih - ((v - lo) / (hi - lo)) * ih;

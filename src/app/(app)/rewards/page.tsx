@@ -35,7 +35,7 @@ export default async function Rewards({ searchParams }: { searchParams: Promise<
               {rows.map((r) => (
                 <tr key={`${r.student_id}-${r.step}`}>
                   <td><StudentCell id={r.student_id} handle={r.st.ig_handle} name={r.st.name} /></td>
-                  <td><span className={`font-extrabold ${r.step === 100 ? 'text-brand' : ''}`}>{r.step === 100 ? '🏆 100 posts' : `🎁 ${r.step} posts`}</span></td>
+                  <td><span className={`inline-flex items-center gap-1.5 font-extrabold ${r.step === 100 ? 'text-brand' : ''}`}><span aria-hidden>{r.step === 100 ? '🏆' : '🎁'}</span>{r.step} posts</span></td>
                   <td className="text-ink-soft">{day(r.reached_at)}</td>
                   <td>
                     {show === 'due'

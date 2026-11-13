@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { istToday } from '@/lib/period';
 import { teamClient } from '@/lib/supabase';
 import { callFunction } from '@/lib/functions';
 import { cronToIst, OUTCOME_LABEL, relative } from '@/lib/format';
@@ -41,13 +42,21 @@ export default async function Troubleshooting() {
   ]);
   const { data: unlinked } = await db.from('students').select('id, name, ig_handle, email')
     .eq('status', 'active').is('heartbeat_user_id', null).order('ig_handle');
-  const { data: lastHb } = await db.from('students').select('heartbeat_last_login')
-    .not('heartbeat_user_id', 'is', null).order('heartbeat_last_login', { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
   const { data: renames } = await db.from('rename_requests')
     .select('id, old_handle, new_handle, status, detail, created_at, student_id')
     .in('status', ['needs_review', 'checking']).order('created_at', { ascending: false });
 
   const schedule = cronToIst(cfg?.scrape_cron ?? '');
+  // Spend so far this month, projected to the month's end at the same daily rate (IST days)
+  const pace = (used: number) => {
+    const [y, mo, d] = istToday().split('-').map(Number);
+    const days = new Date(Date.UTC(y, mo, 0)).getUTCDate(), perDay = used / d;
+    return {
+      total: perDay * days,
+      outOn: (limit: number) => new Date(Date.UTC(y, mo - 1, Math.min(days, Math.max(d, Math.floor(limit / (perDay || 1))))))
+        .toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short' }),
+    };
+  };
   const stuck = (runs ?? []).find((r) => ['running', 'ingesting'].includes(r.status)
     && Date.now() - new Date(r.started_at).getTime() > 2 * 3600_000);
   const apify = health.apify;
@@ -65,9 +74,12 @@ export default async function Troubleshooting() {
     },
     { label: 'Stuck runs', ok: !stuck, detail: stuck ? `one started ${relative(stuck.started_at)} hasn’t finished` : 'none' },
     {
-      label: 'Apify credit', ok: !apify || 'error' in apify ? null : apify.limitUsd === null || apify.usedUsd < apify.limitUsd * 0.9,
+      // Warn when this month's pace would use up the plan before the month ends
+      label: 'Apify credit', ok: !apify || 'error' in apify ? null : apify.limitUsd === null || pace(apify.usedUsd).total < apify.limitUsd,
       detail: !apify ? 'couldn’t check' : 'error' in apify ? apify.error
-        : `$${apify.usedUsd.toFixed(2)} used this month${apify.limitUsd ? ` of $${apify.limitUsd}` : ''}`,
+        : `$${apify.usedUsd.toFixed(2)} used this month${apify.limitUsd ? ` of $${apify.limitUsd}` : ''}${
+          apify.limitUsd && pace(apify.usedUsd).total >= apify.limitUsd
+            ? ` · at this pace it runs out around ${pace(apify.usedUsd).outOn(apify.limitUsd)}: upgrade the Apify plan` : ''}`,
     },
     { label: 'Apify key', ok: health.secrets?.apify ?? null, detail: health.secrets ? (health.secrets.apify ? 'set' : 'missing') : 'couldn’t check' },
     {
@@ -76,9 +88,10 @@ export default async function Troubleshooting() {
         : lastSheet === 'ok' ? 'synced after the last run' : lastSheet ?? 'not synced yet',
     },
     {
-      label: 'Heartbeat', ok: health.secrets ? !!health.secrets.heartbeat && !!lastHb : null,
+      // The sync runs every 3 hours once the key is set; "linked" is what it has matched so far
+      label: 'Heartbeat', ok: health.secrets ? !!health.secrets.heartbeat : null,
       detail: !health.secrets ? 'couldn’t check' : !health.secrets.heartbeat ? 'API key missing'
-        : lastHb ? `syncing every 3 hours · ${unlinked?.length ?? 0} not linked` : 'key set, waiting for the first sync',
+        : `syncing every 3 hours · ${unlinked?.length ? `${unlinked.length} not linked` : 'everyone linked'}`,
     },
     {
       label: 'Failure alerts', ok: health.secrets?.alerts && cfg?.alert_emails?.length ? true : null,

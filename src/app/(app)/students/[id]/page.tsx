@@ -284,14 +284,14 @@ export default async function StudentPage({ params, searchParams }: {
             {notes.map((n) => (
               <li key={n.id} className="border-l-2 border-brand pl-3">
                 <p className="whitespace-pre-line">{n.body}</p>
-                <p className="text-xs text-ink-soft mt-1 flex items-center gap-2">
+                <div className="text-xs text-ink-soft mt-1 flex items-center gap-2">
                   {longDate(n.contact_date)} · {n.author}
                   <form action={deleteNote} className="inline">
                     <input type="hidden" name="note_id" value={n.id} />
                     <input type="hidden" name="student_id" value={s.id} />
                     <button className="underline underline-offset-4 hover:text-ink">Delete</button>
                   </form>
-                </p>
+                </div>
               </li>
             ))}
           </ul>

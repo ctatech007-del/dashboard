@@ -235,7 +235,9 @@ export async function uploadCsv(_: FormState, form: FormData): Promise<FormState
   for (const [n, r] of rows.entries()) {
     const line = n + 2;
     const name = r[iName], handle = cleanHandle(r[iHandle] ?? ''), batch = r[iBatch], start = r[iStart];
-    if (!name || !handle || !batch || !isDate(start ?? '')) { problems.push(`row ${line}: missing or invalid value`); continue; }
+    const bad = [!name && 'name missing', !handle && 'handle missing', !batch && 'batch missing',
+      !isDate(start ?? '') && (start ? `start_date "${start}" isn’t YYYY-MM-DD` : 'start_date missing')].filter(Boolean);
+    if (bad.length) { problems.push(`row ${line}: ${bad.join(', ')}`); continue; }
     if (!batches.has(batch)) batches.set(batch, (await batchId(db, batch))!);
     const months = iMonths >= 0 && r[iMonths] ? Number(r[iMonths]) : null;
     const end = iEnd >= 0 && r[iEnd] ? r[iEnd] : null;
