@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { hubStudent } from '@/lib/hub';
 import { day } from '@/lib/format';
 import { REWARD_STEPS } from '@/lib/stamps';
@@ -10,7 +10,7 @@ import { CountUp } from '@/components/hub-fx';
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="text-center px-2">
-      <p className="text-[9px] sm:text-[11px] font-bold tracking-[0.14em] uppercase whitespace-nowrap text-[#f2c45a]">{label}</p>
+      <p className="text-[9px] sm:text-[11px] font-bold tracking-[0.08em] sm:tracking-[0.14em] uppercase whitespace-nowrap text-[#f2c45a]">{label}</p>
       <p className="mt-1 text-2xl sm:text-3xl font-bold text-white tnum leading-none">{children}</p>
     </div>
   );
@@ -19,7 +19,7 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
 export default async function Challenge({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
   const s = await hubStudent(decodeURIComponent(handle));
-  if (!s) notFound();
+  if (!s) redirect(`/hub?notfound=${encodeURIComponent(decodeURIComponent(handle))}`);   // same as a search that finds nothing
   if (s.handle !== decodeURIComponent(handle)) redirect(`/hub/${s.handle}`);   // old handle → current
 
   const reached = new Map(s.rewards.map((r) => [r.step, r.reached_at]));
@@ -54,8 +54,8 @@ export default async function Challenge({ params }: { params: Promise<{ handle: 
             const at = reached.get(n) ?? (n <= s.total_posts ? '' : undefined);
             return (
               <li key={n} title={at ? `Reached ${day(at)}` : undefined}
-                className={`rounded-full px-4 py-1.5 text-sm font-semibold border-2 ${at !== undefined ? 'coin-1 border-[#d99a1f] text-white' : 'border-gold/70 text-ink'}`}>
-                {n === 100 ? '🏆' : '🎁'} Post {n}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-semibold border-2 ${at !== undefined ? 'coin-1 border-[#d99a1f] text-white' : 'border-gold/70 text-ink'}`}>
+                <span aria-hidden>{n === 100 ? '🏆' : '🎁'}</span>Post {n}
               </li>
             );
           })}

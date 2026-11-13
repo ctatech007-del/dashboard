@@ -141,11 +141,11 @@ body {
 .table { width: 100%; font-size: 0.875rem; }
 .table th {
   text-align: left; font-weight: 800; font-size: 0.7rem; letter-spacing: 0.04em;
-  text-transform: uppercase; color: var(--ink-soft); padding: 0.75rem 1rem;
+  text-transform: uppercase; color: var(--ink-soft); padding: 0.75rem 0.8rem;
   border-bottom: 1px solid var(--rule); white-space: nowrap;
 }
 .table th small { display: block; font-weight: 600; text-transform: none; letter-spacing: 0; }
-.table td { padding: 0.7rem 1rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+.table td { padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
 .table tr:last-child td { border-bottom: 0; }
 .table tbody tr:hover td { background: #fff9f1; }
 

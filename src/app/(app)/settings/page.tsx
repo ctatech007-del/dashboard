@@ -16,14 +16,15 @@ export default async function Settings() {
           <div className="space-y-5">
             <label className="block text-sm">
               <span className="block font-semibold">Posts per week to keep a streak</span>
-              <span className="block text-ink-soft mb-2">A week runs Monday to Sunday, Indian time.</span>
+              <span className="block text-ink-soft mb-2">A week runs Monday to Sunday, Indian time. Used in the CSV export and the Google Sheet.</span>
               <input name="streak_threshold" type="number" min={1} required
                 defaultValue={cfg?.streak_threshold ?? 1} className="field max-w-24" />
             </label>
             <label className="block text-sm">
               <span className="block font-semibold">Milestones</span>
               <span className="block text-ink-soft mb-2">
-                Post totals that count as a milestone, separated by commas. The highest is the finish line.
+                Post totals that count as a milestone, separated by commas, for the CSV export and the Google Sheet.
+                The Hub’s 100 Post Challenge rewards are fixed (10, 15, 30 … 100) and don’t use this.
               </span>
               <input name="milestones" required defaultValue={(cfg?.milestones ?? []).join(', ')} className="field" />
             </label>

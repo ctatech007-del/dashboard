@@ -22,7 +22,7 @@ export default async function Rename({ searchParams }: { searchParams: Promise<{
 
   return (
     <>
-      <p className="text-sm"><Link href="/hub" className="font-bold text-ink-soft hover:text-ink">← Back to leaderboards</Link></p>
+      <p><Link href="/hub" className="glass inline-flex rounded-full px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-white/30">← Back to leaderboards</Link></p>
       <HubTitle>Changed your handle?</HubTitle>
       <div className="card p-6 mt-6 max-w-md mx-auto">
         {s ? (

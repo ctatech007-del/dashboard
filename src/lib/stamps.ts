@@ -68,6 +68,20 @@ export function mrz(name: string, memberSince: string, stamps: number): [string,
 
 export const STAMPS_PER_PAGE = 5;
 
+const ROW_ORDER = new Map(COLLECT_ROWS.flat().map((k, i) => [k, i]));
+
+/**
+ * Passport order: Takeoff first, then oldest first. Stamps earned at the same moment (the follower
+ * stamps given on joining) follow the "Stamps you can collect" order, so 1K comes before 5K.
+ */
+export function passportOrder<T extends { stamp: string; earned_at: string }>(earned: T[]): T[] {
+  const rank = (k: string) => ROW_ORDER.get(k) ?? 99;
+  return [...earned].sort((a, b) =>
+    Number(a.stamp !== 'takeoff') - Number(b.stamp !== 'takeoff')
+    || Date.parse(a.earned_at) - Date.parse(b.earned_at)
+    || rank(a.stamp) - rank(b.stamp));
+}
+
 /** Earned stamps split into visa pages of five, oldest first. */
 export function visaPages<T>(earned: T[]): T[][] {
   const pages: T[][] = [];

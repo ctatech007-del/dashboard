@@ -55,7 +55,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
 
   const growthTop = rank(rows.filter((r) => r.follower_growth !== null && byId.get(r.student_id)?.status === 'active'),
     (r) => r.follower_growth!).slice(0, 5);
-  const { data: topPosts } = await db.from('counted_posts')
+  const { data: topPosts } = await db.from('academy_posts')
     .select('id, student_id, url, views, final_views, posted_at')
     .in('post_type', ['reel', 'video'])
     .gte('posted_at', `${win.m}T00:00:00+05:30`).lte('posted_at', `${win.upto}T23:59:59+05:30`)
@@ -65,7 +65,8 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     .map((p) => ({ ...p, v: p.final_views ?? p.views ?? 0 }))
     .sort((a, b) => b.v - a.v).slice(0, 5);
 
-  const range = `${monthLabel(chartMonths[0])} – ${monthLabel(chartMonths[chartMonths.length - 1])}`;
+  const range = chartMonths.length > 1
+    ? `${monthLabel(chartMonths[0])} – ${monthLabel(chartMonths[chartMonths.length - 1])}` : monthLabel(chartMonths[0]);
   const growthVals = members(rows).map((r) => r.follower_growth).filter((v): v is number => v !== null);
   const postVals = members(rows).map((r) => r.posts);
 
@@ -94,8 +95,8 @@ export default async function Overview({ searchParams }: { searchParams: Promise
             {(() => { const n = members(rows).length - members(prevRows).length; return n === 0 ? '±0' : n > 0 ? `+${n}` : `−${-n}`; })()} students
             <span className="font-semibold opacity-80"> vs {vsLabel}</span>
           </span>
-          <span className="text-xs font-bold text-good">+{jl.joined} joined</span>
-          <span className="text-xs font-bold text-bad">−{jl.left} left</span>
+          <span className={`text-xs font-bold ${jl.joined ? 'text-good' : 'text-ink-soft'}`}>{jl.joined ? `+${jl.joined}` : 0} joined</span>
+          <span className={`text-xs font-bold ${jl.left ? 'text-bad' : 'text-ink-soft'}`}>{jl.left ? `−${jl.left}` : 0} left</span>
         </Kpi>
       </div>
 
@@ -135,9 +136,10 @@ export default async function Overview({ searchParams }: { searchParams: Promise
               {posts.map((p, i) => (
                 <li key={p.id} className="flex items-center gap-3 text-sm">
                   <RankDot rank={i + 1} />
-                  <span className="flex-1 font-bold truncate">@{byId.get(p.student_id)?.ig_handle}</span>
-                  <span className="tnum font-extrabold">{compact(p.v)}</span>
-                  <a href={p.url} target="_blank" rel="noreferrer" className="text-xs text-ink-soft hover:text-ink">views ↗</a>
+                  <Link href={`/students/${p.student_id}`} className="flex-1 font-bold truncate hover:underline">@{byId.get(p.student_id)?.ig_handle}</Link>
+                  <a href={p.url} target="_blank" rel="noreferrer" className="tnum font-extrabold hover:underline" aria-label={`${compact(p.v)} views, open the post`}>
+                    {compact(p.v)} <span className="text-xs font-normal text-ink-soft">views</span> <span className="text-brand">↗</span>
+                  </a>
                 </li>
               ))}
             </ol>

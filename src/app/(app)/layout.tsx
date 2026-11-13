@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="sky min-h-screen">
       <div className="relative z-10 md:grid md:grid-cols-[232px_1fr] md:gap-5 md:p-5">
-        <aside className="navy-glass md:sticky md:top-5 md:h-[calc(100vh-2.5rem)] md:rounded-3xl px-3 py-4 md:py-6 flex md:flex-col gap-4 text-white">
+        <aside className="navy-glass md:sticky md:top-5 md:h-[calc(100vh-2.5rem)] md:rounded-3xl px-3 py-3 md:py-6 flex flex-col gap-2 md:gap-4 text-white">
           <Link href="/" className="display text-2xl md:text-3xl px-3 shrink-0 text-white">Student Stats</Link>
           <NavLinks attention={attention} />
           <div className="hidden md:block mt-auto px-3 text-xs text-white/65 space-y-2">

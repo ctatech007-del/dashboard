@@ -20,7 +20,7 @@ export function Section({ title, action, children, className = '' }: {
     <section className={`card p-5 ${className}`}>
       <div className="flex items-baseline justify-between gap-3 mb-3">
         <h2 className="display text-2xl">{title}</h2>
-        {action}
+        {action && <span className="shrink-0 whitespace-nowrap">{action}</span>}
       </div>
       {children}
     </section>

@@ -13,6 +13,7 @@ export default async function Rewards({ searchParams }: { searchParams: Promise<
     : q.not('sent_at', 'is', null).order('sent_at', { ascending: false }).limit(200));
   const rows = (data ?? []).map((r) => ({ ...r, st: r.students as unknown as { name: string; ig_handle: string; heartbeat_url: string | null } }));
   const { count: due } = await db.from('rewards').select('step', { count: 'exact', head: true }).is('sent_at', null);
+  const { data: cfg } = await db.from('settings').select('reward_messages').maybeSingle();
 
   return (
     <>
@@ -63,7 +64,11 @@ export default async function Rewards({ searchParams }: { searchParams: Promise<
           </table>
         </div>
       )}
-      <p className="text-xs text-ink-soft mt-3">Once Heartbeat is connected (Phase 4), these messages go out automatically and are logged here.</p>
+      <p className="text-xs text-ink-soft mt-3">
+        {cfg?.reward_messages
+          ? 'Reward messages are sent automatically on Heartbeat and logged here.'
+          : <>Automatic reward messages on Heartbeat are off, so send these by hand. Turn them on in <Link href="/settings" className="underline">Settings</Link>.</>}
+      </p>
     </>
   );
 }

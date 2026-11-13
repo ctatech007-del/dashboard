@@ -6,6 +6,7 @@ import { OUTCOME_LABEL } from '@/lib/format';
 import { ContractEnds, Followers, LastContact, LastSeen, NoPost } from '@/components/student-cells';
 import { SortTh, sortHref } from '@/components/sort-header';
 import { Empty, StudentCell } from '@/components/ui';
+import { NEED_DAYS } from '@/lib/needs';
 
 type Filter = 'last_seen' | 'no_post' | 'contract' | 'data';
 const FILTERS: [Filter, string][] = [['last_seen', 'Last seen'], ['no_post', 'No post'], ['contract', 'Contract'], ['data', 'Data problem']];
@@ -27,7 +28,9 @@ export default async function Attention({ searchParams }: {
   const { db } = await teamClient();
   const sp = await searchParams;
   const f = (FILTERS.find(([v]) => v === sp.f)?.[0] ?? 'no_post') as Filter;
-  const d = sp.d === 'all' ? 'all' : BRACKETS.includes(Number(sp.d)) ? Number(sp.d) : 7;
+  // Opens at the same thresholds as the sidebar badge and the Overview (14 days, contract 30 days)
+  const fallback = f === 'data' ? 7 : NEED_DAYS[f];
+  const d = sp.d === 'all' ? 'all' : BRACKETS.includes(Number(sp.d)) ? Number(sp.d) : fallback;
   const sort = parseSort(sp, KEYS, DEFAULT_SORT[f]);
 
   const active = (await studentRows(db)).filter((s) => s.status === 'active');
@@ -51,7 +54,7 @@ export default async function Attention({ searchParams }: {
       <div className="card overflow-hidden border-t-4 !border-t-bad">
         <div className="flex flex-wrap items-center gap-2 p-4">
           {FILTERS.map(([v, label]) => (
-            <Link key={v} href={href(v, v === 'contract' ? 30 : 7)} aria-current={f === v ? 'page' : undefined} className="chip">{label}</Link>
+            <Link key={v} href={href(v, v === 'data' ? 7 : NEED_DAYS[v])} aria-current={f === v ? 'page' : undefined} className="chip">{label}</Link>
           ))}
           {f !== 'data' && (
             <>

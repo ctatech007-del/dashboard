@@ -24,7 +24,7 @@ function New() {
 
 function Board({ title, sub, icon, wide = false, children }: { title: string; sub: string; icon: string; wide?: boolean; children: React.ReactNode }) {
   return (
-    <section className="card relative overflow-hidden !bg-[#fffdf9] p-5 sm:p-7 rise">
+    <section className="card relative !bg-[#fffdf9] p-5 sm:p-7 rise">
       <span aria-hidden className="absolute right-5 top-5 grid place-items-center size-11 sm:size-14 rounded-full bg-[#fff6ee] text-xl sm:text-2xl shadow-[0_6px_18px_-6px_rgba(200,90,20,0.35)] wiggle">{icon}</span>
       <h3 className={`display pr-14 ${wide ? 'text-3xl sm:text-[2.6rem]' : 'text-2xl sm:text-[1.9rem]'}`}>{title}</h3>
       <p className="mt-1 text-sm text-ink-soft">{sub}</p>
@@ -64,7 +64,7 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
           <span className="absolute right-[30%] bottom-14 text-xs opacity-60">✦</span>
         </div>
 
-        <p className="relative text-xs sm:text-sm font-bold tracking-[0.22em] uppercase">Search your IG handle to open your</p>
+        <p className="relative text-[11px] sm:text-sm font-bold tracking-[0.16em] sm:tracking-[0.22em] uppercase text-balance">Search your IG handle to open your</p>
         <p className="relative mt-3 flex flex-wrap justify-center items-center gap-3">
           <span className="display text-2xl sm:text-[2.6rem] rounded-2xl bg-white text-brand px-4 py-1.5 flex items-center gap-2.5 shadow-[0_6px_0_rgba(150,60,0,0.25)] -rotate-1">
             <GridIcon className="size-6 sm:size-8" />100 Post Challenge
@@ -116,7 +116,7 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
                         <Coin rank={place} className={place === 1 ? 'size-16 sm:size-24 text-2xl sm:text-4xl' : 'size-12 sm:size-[4.5rem] text-lg sm:text-3xl'} />
                         {place === 1 && <><span aria-hidden className="absolute -left-5 top-4 text-gold text-sm bob">✦</span><span aria-hidden className="absolute -right-4 bottom-2 text-gold text-sm">✦</span></>}
                       </span>
-                      <p className="mt-3 text-sm sm:text-lg font-bold truncate"><Who handle={g.ig_handle} /></p>
+                      <p className="mt-3 text-xs sm:text-lg font-bold leading-tight [overflow-wrap:anywhere]"><Who handle={g.ig_handle} /></p>
                       <p className="text-xl sm:text-3xl font-extrabold text-good tnum">+<CountUp to={g.value} /></p>
                       <p className="text-xs sm:text-sm text-ink-soft">followers</p>
                       <p className="mt-2 mb-4"><Move rank={g.rank} prev={g.prev_rank} /></p>
@@ -138,13 +138,17 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
           {b.viral.length ? (
             <ol className="mt-4 divide-y divide-rule">
               {b.viral.map((v) => (
-                <li key={v.url} className="flex items-center gap-3 py-3 text-sm">
-                  <Coin rank={v.rank} />
-                  <span className="flex-1 min-w-0 flex items-center gap-2">
-                    <Who handle={v.ig_handle} className="truncate font-semibold" />{v.is_new && <New />}
-                  </span>
-                  <a href={v.url} target="_blank" rel="noreferrer" className="tnum font-extrabold hover:underline whitespace-nowrap" aria-label={`${compact(v.value)} views, open the post`}>
-                    {compact(v.value)} <span className="font-normal text-ink-soft">views</span> <span className="text-brand">↗</span>
+                // The whole entry opens the post itself (client, 13 Nov), not the profile
+                <li key={v.url}>
+                  <a href={v.url} target="_blank" rel="noreferrer" aria-label={`@${v.ig_handle}: ${compact(v.value)} views, open the post on Instagram`}
+                    className="group -mx-2 flex items-center gap-2.5 sm:gap-3 rounded-xl px-2 py-3 text-sm hover:bg-[#fff3e6]">
+                    <Coin rank={v.rank} />
+                    <span className="flex-1 min-w-0 flex items-center gap-2">
+                      <span className="truncate font-semibold group-hover:text-brand">@{v.ig_handle}</span>{v.is_new && <New />}
+                    </span>
+                    <span className="tnum font-extrabold whitespace-nowrap">
+                      {compact(v.value)} <span className="hidden sm:inline font-normal text-ink-soft">views</span> <span className="text-brand">↗</span>
+                    </span>
                   </a>
                 </li>
               ))}
@@ -156,14 +160,14 @@ export default async function Hub({ searchParams }: { searchParams: Promise<{ no
           {b.total_posts.length ? (
             <ol className="mt-4 divide-y divide-rule">
               {b.total_posts.map((t, i) => (
-                <li key={t.ig_handle} className="flex items-center gap-3 py-3 text-sm">
+                <li key={t.ig_handle} className="relative flex items-center gap-2.5 sm:gap-3 py-3 text-sm">
                   <Coin rank={t.rank} />
                   <span className="flex-1 min-w-0 flex items-center gap-2">
                     <Who handle={t.ig_handle} className="truncate font-semibold" />
                     {i === b.total_posts.length - 1 && b.total_posts_tied.length > 0 && (
-                      <details className="relative">
+                      <details>
                         <summary className="list-none cursor-pointer text-xs font-bold rounded-full px-2 py-0.5 bg-paper whitespace-nowrap">👥 +{b.total_posts_tied.length}</summary>
-                        <ul className="absolute left-0 z-20 mt-1 w-52 card p-3 text-xs space-y-1.5">
+                        <ul className="absolute inset-x-0 top-full z-20 -mt-1 card !bg-white p-3 text-sm space-y-1.5 shadow-xl">
                           <li className="text-ink-soft">Also on {t.value} posts:</li>
                           {b.total_posts_tied.map((h) => <li key={h}><Who handle={h} className="font-semibold" /></li>)}
                         </ul>

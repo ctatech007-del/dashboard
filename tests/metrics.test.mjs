@@ -286,6 +286,18 @@ test('daily snapshots: follower growth, posts with tie order, viral last 7 days'
   const v = await one(`select rank, value from ranking_snapshots where day = '2026-11-25' and board = 'viral' and item =
     (select id::text from posts where shortcode = 'viral1')`);
   assert.deepEqual(v, { rank: 1, value: 5000 });
+
+  // A Reel from before joining never makes Most Viral, however many views it has
+  const late = await student('RC', 'rank_c', 'Rank', '2026-11-22');
+  await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url, views)
+    values ($1, 'before_join', 'reel', $2, 'u', 900000)`, [late, ist('2026-11-21 10:00')]);
+  await db.exec(`select snapshot_rankings('2026-11-25')`);
+  assert.equal((await one(`select count(*)::int n from ranking_snapshots where day = '2026-11-25' and board = 'viral'
+    and item = (select id::text from posts where shortcode = 'before_join')`)).n, 0);
+  assert.equal((await one(`select rank from ranking_snapshots where day = '2026-11-25' and board = 'viral' and item =
+    (select id::text from posts where shortcode = 'viral1')`)).rank, 1);
+  assert.equal((await one(`select count(*)::int n from academy_posts where shortcode = 'before_join'`)).n, 0);
+  assert.equal((await one(`select count(*)::int n from academy_posts where shortcode = 'viral1'`)).n, 1);
 });
 
 test('daily rollup marks a post on two students\' grids as a collab', async () => {

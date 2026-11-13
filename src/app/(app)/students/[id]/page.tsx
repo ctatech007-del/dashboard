@@ -95,6 +95,9 @@ export default async function StudentPage({ params, searchParams }: {
 
   const monthsIn = Math.max(1, daysBetween(s.start_date, today) / 30.44);
   const avgPerMonth = counted.length / monthsIn;
+  // How long they've been in: days for the first month, then whole months
+  const daysIn = daysBetween(s.start_date, today);
+  const tenure = daysIn < 31 ? `${daysIn} ${daysIn === 1 ? 'day' : 'days'}` : `${Math.floor(daysIn / 30.44)} mo`;
   const lastPostDays = row?.noPostDays ?? null;
   const contractLeft = info?.contract_end ? daysBetween(today, info.contract_end) : null;
   const contractTotal = info?.contract_end ? daysBetween(s.start_date, info.contract_end) : null;
@@ -106,6 +109,8 @@ export default async function StudentPage({ params, searchParams }: {
   // Per month for this student, last 12 months (or since joining)
   const months12 = Array.from({ length: 12 }, (_, i) => addMonths(monthStart(today), i - 11))
     .filter((m) => m >= monthStart(s.start_date));
+  const monthSpan = months12.length > 1
+    ? `${monthLabel(months12[0])} – ${monthLabel(months12[months12.length - 1])}` : monthLabel(months12[0]);
   const istDay = (t: string) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
   const perMonth = months12.map((m) => {
     const end = monthEnd(m) < today ? monthEnd(m) : today;
@@ -149,7 +154,7 @@ export default async function StudentPage({ params, searchParams }: {
               : <Link href={`/roster?edit=${s.id}`} className="text-ink-soft hover:text-ink">Add Heartbeat link</Link>}
           </p>
           <p className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 rounded-full border border-rule bg-surface px-4 py-1.5 text-sm text-ink-soft">
-            <span>Member since <strong className="text-ink">{monthYear(info?.intake_month ?? s.start_date)}</strong> · {Math.floor(monthsIn)} mo</span>
+            <span>Member since <strong className="text-ink">{monthYear(info?.intake_month ?? s.start_date)}</strong> · {tenure}</span>
             {info?.contract_months && <span>{info.contract_months}-month contract</span>}
             {s.status === 'left' && info?.leave_date
               ? <strong className="text-ink">Left {day(info.leave_date)}</strong>
@@ -229,14 +234,14 @@ export default async function StudentPage({ params, searchParams }: {
       <div className="grid lg:grid-cols-2 gap-3 mb-4">
         <section className="card p-5">
           <h2 className="display text-2xl">Follower growth per month</h2>
-          <p className="text-xs text-ink-soft mb-2">{monthLabel(months12[0])} – {monthLabel(months12[months12.length - 1])}</p>
+          <p className="text-xs text-ink-soft mb-2">{monthSpan}</p>
           <ColumnChart title={`Follower growth of @${s.ig_handle} per month`} format={(v) => compact(Math.round(v))}
             color="#2f8f52" tint="#a9d3b5"
             data={perMonth.map((x) => ({ label: monthLabel(x.m, { short: true }), value: x.growth, partial: x.current }))} />
         </section>
         <section className="card p-5">
           <h2 className="display text-2xl">Posts per month</h2>
-          <p className="text-xs text-ink-soft mb-2">{monthLabel(months12[0])} – {monthLabel(months12[months12.length - 1])}</p>
+          <p className="text-xs text-ink-soft mb-2">{monthSpan}</p>
           <ColumnChart title={`Posts by @${s.ig_handle} per month`} format={(v) => String(Math.round(v))}
             color="#d9661a" tint="#f2c3a0"
             data={perMonth.map((x) => ({ label: monthLabel(x.m, { short: true }), value: x.posts, partial: x.current }))} />

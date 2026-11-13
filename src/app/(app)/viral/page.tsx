@@ -22,7 +22,7 @@ export default async function ViralReels({ searchParams }: {
   const sort = parseSort(sp, ['views', 'posted', 'followers'], { key: 'views', dir: 'desc' });
 
   // Only final (day-7) counts rank here. Students who left keep their Reels on this list.
-  let q = db.from('counted_posts')
+  let q = db.from('academy_posts')
     .select('id, student_id, url, posted_at, final_views')
     .in('post_type', ['reel', 'video']).not('final_views', 'is', null)
     .order('final_views', { ascending: false }).limit(limit);

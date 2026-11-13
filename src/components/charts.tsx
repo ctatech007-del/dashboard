@@ -58,7 +58,7 @@ export function ColumnChart({ data, format, height = 200, title, color = MARK, t
             <g key={d.label}>
               <title>{d.tip ?? `${d.label}: ${v === null ? 'no data' : format(v)}${d.partial ? ' (so far)' : ''}`}</title>
               <rect x={cx - band / 2} y={PAD.t} width={band} height={ih} fill="transparent" />
-              {v !== null && <path d={path} fill={tint && !d.partial ? tint : color} />}
+              {v !== null && <path d={path} fill={neg ? (d.partial || !tint ? '#c8463b' : '#eab1aa') : tint && !d.partial ? tint : color} />}
               {showValue && (
                 <text x={cx} y={neg ? top + h + 13 : top - 5} textAnchor="middle" fontSize="11" fontWeight="700" fill="#2b2119" className="tnum">
                   {format(v!)}
@@ -73,10 +73,10 @@ export function ColumnChart({ data, format, height = 200, title, color = MARK, t
       {data.some((d) => d.partial) && (
         <figcaption className="text-xs text-ink-soft mt-1">The current month is so far, not complete.</figcaption>
       )}
-      <table className="sr-only">
+      <div className="sr-only"><table>
         <caption>{title}</caption>
         <tbody>{data.map((d) => <tr key={d.label}><th>{d.label}{d.partial ? ' (so far)' : ''}</th><td>{d.value === null ? '–' : format(d.value)}</td></tr>)}</tbody>
-      </table>
+      </table></div>
     </figure>
   );
 }
@@ -87,12 +87,16 @@ export function LineChart({ points, format, height = 220, title }: {
   if (points.length < 2) {
     return <p className="text-sm text-ink-soft py-8 text-center">Not enough daily counts yet: the chart starts after two scrapes.</p>;
   }
-  const H = height, ih = H - PAD.t - PAD.b, iw = W - PAD.l - PAD.r - 30;
   const vals = points.map((p) => p.value);
   const ticks = niceTicks(Math.min(...vals), Math.max(...vals));
   const lo = ticks[0], hi = ticks[ticks.length - 1];
+  // When rounding makes the axis labels identical (3.8M, 3.8M, 3.8M), show the full numbers instead
+  const shown = ticks.map(format);
+  const label = new Set(shown).size === shown.length ? format : (v: number) => Math.round(v).toLocaleString('en-US');
+  const padL = Math.max(PAD.l, Math.max(...ticks.map((t) => label(t).length)) * 6.6 + 10);
+  const H = height, ih = H - PAD.t - PAD.b, iw = W - padL - PAD.r - 30 - (label === format ? 0 : 30);
   const t0 = Date.parse(points[0].day), t1 = Date.parse(points[points.length - 1].day);
-  const x = (d: string) => PAD.l + ((Date.parse(d) - t0) / (t1 - t0 || 1)) * iw;
+  const x = (d: string) => padL + ((Date.parse(d) - t0) / (t1 - t0 || 1)) * iw;
   const y = (v: number) => PAD.t + ih - ((v - lo) / (hi - lo || 1)) * ih;
   const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(p.day).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const last = points[points.length - 1];
@@ -103,26 +107,26 @@ export function LineChart({ points, format, height = 220, title }: {
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={title}>
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={PAD.l} x2={PAD.l + iw} y1={y(t)} y2={y(t)} stroke={RULE} strokeWidth="1" />
-            <text x={PAD.l - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill={INK_SOFT} className="tnum">{format(t)}</text>
+            <line x1={padL} x2={padL + iw} y1={y(t)} y2={y(t)} stroke={RULE} strokeWidth="1" />
+            <text x={padL - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill={INK_SOFT} className="tnum">{label(t)}</text>
           </g>
         ))}
-        <path d={`${line} L${x(last.day)},${y(lo)} L${PAD.l},${y(lo)} z`} fill={MARK} opacity="0.1" />
+        <path d={`${line} L${x(last.day)},${y(lo)} L${padL},${y(lo)} z`} fill={MARK} opacity="0.1" />
         <path d={line} fill="none" stroke={MARK} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {points.map((p) => (
           <circle key={p.day} cx={x(p.day)} cy={y(p.value)} r="7" fill="transparent">
-            <title>{`${dayLabel(p.day)}: ${format(p.value)}`}</title>
+            <title>{`${dayLabel(p.day)}: ${label(p.value)}`}</title>
           </circle>
         ))}
         <circle cx={x(last.day)} cy={y(last.value)} r="4.5" fill={MARK} stroke={SURFACE} strokeWidth="2" />
-        <text x={x(last.day) + 8} y={y(last.value) + 4} fontSize="11" fontWeight="700" fill="#2b2119" className="tnum">{format(last.value)}</text>
-        <text x={PAD.l} y={H - 8} fontSize="11" fill={INK_SOFT}>{dayLabel(points[0].day)}</text>
-        <text x={PAD.l + iw} y={H - 8} textAnchor="end" fontSize="11" fill={INK_SOFT}>{dayLabel(last.day)}</text>
+        <text x={x(last.day) + 8} y={y(last.value) + 4} fontSize="11" fontWeight="700" fill="#2b2119" className="tnum">{label(last.value)}</text>
+        <text x={padL} y={H - 8} fontSize="11" fill={INK_SOFT}>{dayLabel(points[0].day)}</text>
+        <text x={padL + iw} y={H - 8} textAnchor="end" fontSize="11" fill={INK_SOFT}>{dayLabel(last.day)}</text>
       </svg>
-      <table className="sr-only">
+      <div className="sr-only"><table>
         <caption>{title}</caption>
         <tbody>{points.map((p) => <tr key={p.day}><th>{p.day}</th><td>{format(p.value)}</td></tr>)}</tbody>
-      </table>
+      </table></div>
     </figure>
   );
 }

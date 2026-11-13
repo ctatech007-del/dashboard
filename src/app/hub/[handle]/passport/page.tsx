@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { hubStudent } from '@/lib/hub';
-import { COLLECT_ROWS, mrz, placement, STAMP, STAMPS, visaPages } from '@/lib/stamps';
+import { COLLECT_ROWS, mrz, passportOrder, placement, STAMP, STAMPS, visaPages } from '@/lib/stamps';
 import { Plane, Stamp, StudentHeader, Updated } from '@/components/hub';
 import { Booklet } from '@/components/hub-booklet';
 import { CountUp } from '@/components/hub-fx';
@@ -23,10 +23,10 @@ function Paper({ n, visa, children }: { n: number; visa?: boolean; children: Rea
 export default async function Passport({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
   const s = await hubStudent(decodeURIComponent(handle));
-  if (!s) notFound();
+  if (!s) redirect(`/hub?notfound=${encodeURIComponent(decodeURIComponent(handle))}`);   // same as a search that finds nothing
   if (s.handle !== decodeURIComponent(handle)) redirect(`/hub/${s.handle}/passport`);
 
-  const earned = s.stamps.filter((x) => STAMP.has(x.stamp));   // Takeoff first, then oldest first
+  const earned = passportOrder(s.stamps.filter((x) => STAMP.has(x.stamp)));   // Takeoff first, then oldest first
   const got = new Set(earned.map((x) => x.stamp));
   const since = new Date(`${s.member_since}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', month: 'short', year: 'numeric' });
   const [mrz1, mrz2] = mrz(s.name, s.member_since, earned.length);

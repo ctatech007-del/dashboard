@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { mrz, placement, REWARD_STEPS, STAMPS, visaPages } from '../src/lib/stamps.ts';
+import { mrz, passportOrder, placement, REWARD_STEPS, STAMPS, visaPages } from '../src/lib/stamps.ts';
 
 test('22 stamps, keys unique, and every key is one the database awards', () => {
   assert.equal(STAMPS.length, 22);
@@ -41,4 +41,15 @@ test('stamp placement is stable per member and tilted at most 17 degrees', () =>
   const a = placement('julian_boes_', 'takeoff', 0);
   assert.deepEqual(a, placement('julian_boes_', 'takeoff', 0));
   for (let i = 0; i < 50; i++) assert.ok(Math.abs(placement(`h${i}`, 'nomad', i).tilt) <= 17);
+});
+
+test('passport order: Takeoff first, oldest first, same-moment stamps in collect order', () => {
+  const at = '2026-11-10T00:30:00Z', later = '2026-11-11T00:30:00Z';
+  const got = passportOrder([
+    { stamp: 'co_pilot', earned_at: later },
+    { stamp: 'legend', earned_at: at }, { stamp: 'globetrotter', earned_at: at },
+    { stamp: 'wanderer', earned_at: at }, { stamp: 'explorer', earned_at: at },
+    { stamp: 'takeoff', earned_at: '2026-11-10T00:00:00Z' },
+  ]).map((x) => x.stamp);
+  assert.deepEqual(got, ['takeoff', 'wanderer', 'explorer', 'globetrotter', 'legend', 'co_pilot']);
 });
