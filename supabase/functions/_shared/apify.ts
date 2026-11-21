@@ -141,3 +141,14 @@ export function missingHandles(requested: string[], items: RawProfile[]): string
   const seen = new Set(items.map((i) => cleanHandle(i.username ?? i.inputUrl ?? '')));
   return requested.map(cleanHandle).filter((h) => !seen.has(h));
 }
+
+/**
+ * How to report profiles that came back with no item at all. One or two missing usually means a
+ * renamed or deleted account; many at once means the run stopped early (e.g. Apify's monthly credit
+ * ran out), so they are a read error for this run, not "not found".
+ */
+export function missingOutcome(missing: number, requested: number): { outcome: Outcome; detail: string } {
+  return missing > Math.max(2, requested * 0.2)
+    ? { outcome: 'error', detail: 'Not returned by Apify this run (the run stopped early, often a used-up credit); tried again tomorrow' }
+    : { outcome: 'not_found', detail: 'No profile returned: renamed, deleted or blocked' };
+}

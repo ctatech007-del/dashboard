@@ -1,9 +1,8 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { hubStudent } from '@/lib/hub';
 import { day } from '@/lib/format';
 import { REWARD_STEPS } from '@/lib/stamps';
-import { StudentHeader, Updated } from '@/components/hub';
+import { RenameNote, StudentHeader, Updated } from '@/components/hub';
 import { ChallengeProgress, PostGrid } from '@/components/hub-challenge';
 import { CountUp } from '@/components/hub-fx';
 
@@ -16,15 +15,24 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
+// Cached for 5 minutes, like the Hub home (the data changes once a day)
+export const revalidate = 300;
+// Built on first visit, then served from the cache
+export async function generateStaticParams() { return []; }
+
 export default async function Challenge({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
   const s = await hubStudent(decodeURIComponent(handle));
-  if (!s) redirect(`/hub?notfound=${encodeURIComponent(decodeURIComponent(handle))}`);   // same as a search that finds nothing
+  if (!s) redirect(`/hub/missing/${encodeURIComponent(decodeURIComponent(handle))}`);   // same as a search that finds nothing
   if (s.handle !== decodeURIComponent(handle)) redirect(`/hub/${s.handle}`);   // old handle → current
 
   const reached = new Map(s.rewards.map((r) => [r.step, r.reached_at]));
   // Level = 1 + milestones reached (the client's rule)
   const level = 1 + REWARD_STEPS.filter((n) => n <= s.total_posts).length;
+  const next = REWARD_STEPS.find((n) => n > s.total_posts);
+  // Rewards reached in the last 7 days get the gift-opening burst (see PostGrid)
+  const weekAgo = Date.now() - 7 * 864e5;
+  const recent = s.rewards.filter((r) => r.reached_at && Date.parse(r.reached_at) >= weekAgo).map((r) => r.step);
 
   return (
     <>
@@ -38,33 +46,37 @@ export default async function Challenge({ params }: { params: Promise<{ handle: 
 
       <section className="card mt-6 p-5 sm:p-8 rise">
         <ChallengeProgress total={Math.min(100, s.total_posts)} posts={s.total_posts} />
-        <div className="mt-7"><PostGrid total={Math.min(100, s.total_posts)} handle={s.handle} /></div>
-        <p className="mt-4 text-xs text-ink-soft text-center">
-          Every feed post since you joined counts (reels, carousels, static posts). Stories aren’t included.
-        </p>
+        <div className="mt-7"><PostGrid total={Math.min(100, s.total_posts)} handle={s.handle} recent={recent} /></div>
 
         <hr className="my-7 border-0 border-t-2 border-dashed border-rule" />
 
         <h2 className="display text-2xl sm:text-3xl">🎁 Rewards along the way</h2>
         <p className="text-ink-soft mt-2 mb-5">
-          Every gift circle unlocks a reward. When you reach one, we’ll message you on Heartbeat with what it is and how to claim it.
+          The gold circles are your milestones. Every time you reach one, a new reward unlocks.
+          We’ll send you a message on Heartbeat to let you know what it is and how to claim it.
         </p>
         <ol className="flex flex-wrap gap-2.5">
           {REWARD_STEPS.map((n) => {
-            const at = reached.get(n) ?? (n <= s.total_posts ? '' : undefined);
+            const got = n <= s.total_posts, isNext = n === next;
             return (
-              <li key={n} title={at ? `Reached ${day(at)}` : undefined}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-semibold border-2 ${at !== undefined ? 'coin-1 border-[#d99a1f] text-white' : 'border-gold/70 text-ink'}`}>
-                <span aria-hidden>{n === 100 ? '🏆' : '🎁'}</span>Post {n}
+              <li key={n} title={got ? (reached.get(n) ? `Reached ${day(reached.get(n)!)}` : 'Reached') : isNext ? 'Your next reward' : undefined}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold border-2 ${
+                  got ? 'bg-good border-good text-white'
+                    : isNext ? 'bg-[#fff1e3] border-brand text-brand next-pulse'
+                      : 'border-gold/70 text-ink'}`}>
+                <span aria-hidden>🎁</span>Post {n}
               </li>
             );
           })}
         </ol>
+
+        <hr className="mt-7 mb-5 border-0 border-t-2 border-dashed border-rule" />
+        <p className="text-xs sm:text-sm text-ink-soft text-center">
+          Every feed post since you joined counts (Reels, carousels, static posts). Stories and Trial Reels aren’t included.
+        </p>
       </section>
 
-      <p className="on-sky text-center text-sm mt-7 md:whitespace-nowrap">
-        Changed your Instagram handle? <Link href="/hub/rename" className="font-bold underline">Tell us here</Link>, and your posts and passport stamps stay with you.
-      </p>
+      <RenameNote />
       <Updated at={s.updated_at} />
     </>
   );

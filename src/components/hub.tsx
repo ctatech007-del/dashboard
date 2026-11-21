@@ -1,15 +1,35 @@
 import Link from 'next/link';
-import { relative } from '@/lib/format';
 import { STAMP, tilt, type StampDef } from '@/lib/stamps';
 
 export function HubTitle({ children }: { children: React.ReactNode }) {
   return <h1 className="display on-sky text-5xl md:text-7xl text-center rise">{children}</h1>;
 }
 
+/** When the data was last updated, as a clock time (the daily update runs at 06:00 IST). */
 export function Updated({ at }: { at: string | null }) {
   return (
     <p className="on-sky text-xs mt-8 flex items-center gap-1.5">
-      <span aria-hidden>🔄</span>{at ? `Updated ${relative(at)}` : 'Not updated yet'}
+      <span aria-hidden>🔄</span>{at ? `Updated ${updatedAt(at)} · updates every day at 6:00 IST` : 'Not updated yet'}
+    </p>
+  );
+}
+
+/** "today, 06:02 IST" / "yesterday, 06:02 IST" / "19 Nov, 06:02 IST" */
+export function updatedAt(ts: string) {
+  const ist = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const t = new Date(ts), now = new Date();
+  const time = t.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+  const when = ist(t) === ist(now) ? 'today'
+    : ist(t) === ist(new Date(now.getTime() - 864e5)) ? 'yesterday'
+      : t.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
+  return `${when}, ${time} IST`;
+}
+
+/** The handle-change note under a student's pages, as a dark pill like the client's version. */
+export function RenameNote() {
+  return (
+    <p className="mx-auto mt-8 w-fit max-w-full rounded-2xl bg-[#2b2119]/80 px-4 py-2.5 text-center text-sm text-white shadow-lg md:whitespace-nowrap">
+      <span aria-hidden className="mr-1.5">⚠️</span>Changed your Instagram handle? <Link href="/hub/rename" className="font-bold text-[#f6a75b] underline">Tell us here</Link>, and your posts and passport stamps stay with you.
     </p>
   );
 }
@@ -25,7 +45,7 @@ export function StudentHeader({ handle, active }: { handle: string; active: 'cha
   );
   return (
     <>
-      <p><Link href="/hub" className="glass inline-flex rounded-full px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-white/30">← Back to leaderboards</Link></p>
+      <p className="mb-5 sm:mb-7"><Link href="/hub" className="glass inline-flex rounded-full px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-white/30">← Back to leaderboards</Link></p>
       <HubTitle>{active === 'challenge' ? '100 Post Challenge' : 'CTA Passport'}</HubTitle>
       <p className="on-sky text-center mt-3 text-sm sm:text-base">
         IG Handle: <a href={`https://www.instagram.com/${handle}/`} target="_blank" rel="noreferrer"

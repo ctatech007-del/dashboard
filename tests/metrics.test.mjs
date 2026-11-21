@@ -468,3 +468,22 @@ test('views stamps count only Reels posted after joining', async () => {
   const got = (await stampsOf(s)).map((x) => x.stamp);
   assert.ok(got.includes('hidden_gem') && !got.includes('landmark'));
 });
+
+test('views stamps come the day a Reel passes the mark, before its day-7 count', async () => {
+  const s = await student('VE', 'views_early', 'Hub', '2026-11-10');
+  const { rows: [old] } = await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url)
+    values ($1, 'early_old', 'reel', $2, 'u') returning id`, [s, ist('2026-11-05 10:00')]);
+  const { rows: [p] } = await db.query(`insert into posts (student_id, shortcode, post_type, posted_at, url)
+    values ($1, 'early_hit', 'reel', $2, 'u') returning id`, [s, ist('2026-11-12 10:00')]);
+  await db.query(`insert into post_views (post_id, day, views) values ($1, '2026-11-13', 2000000)`, [old.id]);
+  assert.equal((await stampsOf(s)).filter((x) => x.stamp !== 'takeoff').length, 0);   // before joining: nothing
+  await db.query(`insert into post_views (post_id, day, views) values ($1, '2026-11-13', 150000)`, [p.id]);
+  let got = (await stampsOf(s)).map((x) => x.stamp);
+  assert.ok(got.includes('hidden_gem') && got.includes('landmark') && !got.includes('wonder_of_the_world'));
+  await db.query(`insert into post_views (post_id, day, views) values ($1, '2026-11-14', 1200000)`, [p.id]);
+  got = (await stampsOf(s)).map((x) => x.stamp);
+  assert.ok(got.includes('wonder_of_the_world'));
+  const w = await one(`select (earned_at at time zone 'Asia/Kolkata')::date::text d from stamps
+    where student_id = $1 and stamp = 'wonder_of_the_world'`, [s]);
+  assert.equal(w.d, '2026-11-14');
+});

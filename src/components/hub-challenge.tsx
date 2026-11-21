@@ -42,55 +42,69 @@ export function ChallengeProgress({ total, posts }: { total: number; posts: numb
 }
 
 /**
- * 10 × 10 circles: orange = not posted yet, green ✓ = posted, gifts at the milestones, a glowing
- * trophy at 100. A milestone reached since the student last looked opens with a little animation.
+ * The 100 circles, as in the client's version: 1–99 in rows of ten (orange = not yet, green ✓ =
+ * posted, navy gift circles with a breathing gold ring at the milestones) and Post 100 as a big
+ * trophy circle centred underneath.
+ *
+ * Gift opening + emoji burst (the rule): it plays once per reward on each phone or computer, for
+ * rewards reached in the last 7 days. So a student who reaches 10 posts sees it the next time they
+ * open their page (even the very first time), and never again for that reward on that device.
  */
-export function PostGrid({ total, handle }: { total: number; handle: string }) {
+export function PostGrid({ total, handle, recent }: { total: number; handle: string; recent: number[] }) {
   const steps = new Set(REWARD_STEPS);
   const [opening, setOpening] = useState<number[]>([]);
 
   useEffect(() => {
     const key = `cta-gifts-${handle}`;
-    const reached = REWARD_STEPS.filter((s) => s <= total);
-    let seen: number[] | null = null;
+    let seen: number[] = [];
     try {
-      const raw = localStorage.getItem(key);
-      seen = raw === null ? null : JSON.parse(raw);
-      localStorage.setItem(key, JSON.stringify(reached));
+      seen = JSON.parse(localStorage.getItem(key) ?? '[]');
+      localStorage.setItem(key, JSON.stringify([...new Set([...seen, ...recent])]));
     } catch { return; }   // storage blocked: no animation, nothing breaks
-    // First visit only remembers what's already reached; later visits open the new gifts
-    const fresh = seen === null || still() ? [] : reached.filter((s) => !seen!.includes(s));
+    const fresh = still() ? [] : recent.filter((s) => s <= total && !seen.includes(s));
     if (!fresh.length) return;
     setOpening(fresh);
     const t = setTimeout(() => { burst(); setOpening([]); }, 1300);
     return () => clearTimeout(t);
-  }, [handle, total]);
+  }, [handle, total, recent]);
+
+  const check = (cls: string) => (
+    <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+      <path d="M5 12.5l4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  const done100 = total >= 100;
 
   return (
-    <ol className="grid grid-cols-10 gap-1.5 sm:gap-2.5 pb-6" aria-label={`${total} of 100 posts done`}>
-      {Array.from({ length: 100 }, (_, i) => {
-        const n = i + 1, done = n <= total, gift = steps.has(n) && n < 100, open = opening.includes(n);
-        let look: string, body: React.ReactNode = n;
-        if (n === 100) {
-          look = `${done ? 'coin-1' : 'bg-[var(--hub-navy)]'} text-white glow scale-110 z-10`;
-          body = <span className="text-base sm:text-2xl">🏆</span>;
-        } else if (gift && (!done || open)) {
-          look = `bg-[var(--hub-navy)] ring-2 sm:ring-[3px] ring-gold ${open ? 'gift-open' : ''}`;
-          body = <span className="text-sm sm:text-lg">🎁</span>;
-        } else if (done) {
-          look = `bg-good text-white shadow-[inset_0_-3px_0_rgba(0,0,0,0.15)] ${gift ? 'ring-2 sm:ring-[3px] ring-gold' : ''}`;
-          body = <svg viewBox="0 0 24 24" className="size-3 sm:size-5" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12.5l4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-        } else {
-          look = 'bg-brand text-white shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]';
-        }
-        return (
-          <li key={n} title={n === 100 ? 'Post 100: the finish line' : gift ? `Reward at ${n} posts` : `Post ${n}`}
-            className={`relative aspect-square rounded-full grid place-items-center text-[10px] sm:text-sm font-bold tnum select-none ${look}`}>
-            {body}
-            {n === 100 && <span className="absolute -bottom-5 sm:-bottom-6 whitespace-nowrap text-[9px] sm:text-xs font-bold text-ink">Post 100</span>}
-          </li>
-        );
-      })}
-    </ol>
+    <div aria-label={`${total} of 100 posts done`}>
+      <ol className="grid grid-cols-10 gap-1.5 sm:gap-2.5">
+        {Array.from({ length: 99 }, (_, i) => {
+          const n = i + 1, done = n <= total, gift = steps.has(n), open = opening.includes(n);
+          let look: string, body: React.ReactNode = n;
+          if (gift && (!done || open)) {
+            look = `bg-[var(--hub-navy)] gold-pulse ${open ? 'gift-open' : ''}`;
+            body = <span className="text-sm sm:text-lg">🎁</span>;
+          } else if (done) {
+            look = `bg-good text-white shadow-[inset_0_-3px_0_rgba(0,0,0,0.15)] ${gift ? 'ring-2 sm:ring-[3px] ring-gold' : ''}`;
+            body = check('size-3 sm:size-5');
+          } else {
+            look = 'bg-brand text-white shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]';
+          }
+          return (
+            <li key={n} title={gift ? `Reward at ${n} posts` : `Post ${n}`}
+              style={gift ? { animationDelay: `${(n % 7) * -0.35}s` } : undefined}
+              className={`relative aspect-square rounded-full grid place-items-center text-[10px] sm:text-sm font-bold tnum select-none ${look}`}>
+              {body}
+            </li>
+          );
+        })}
+      </ol>
+      <div className="mt-6 sm:mt-8 flex flex-col items-center" title="Post 100: the finish line">
+        <span className={`grid place-items-center size-20 sm:size-28 rounded-full text-white ${done100 ? 'bg-good glow' : 'bg-[var(--hub-navy)] gold-pulse'}`}>
+          {done100 ? check('size-9 sm:size-12') : <span className="text-4xl sm:text-5xl">🏆</span>}
+        </span>
+        <span className="mt-2.5 text-xs sm:text-sm font-extrabold tracking-[0.18em] uppercase text-[#c8962a]">Post 100</span>
+      </div>
+    </div>
   );
 }

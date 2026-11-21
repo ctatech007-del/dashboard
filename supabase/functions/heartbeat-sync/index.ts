@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
       .select('id, name, ig_handle, email, heartbeat_user_id, heartbeat_last_login')
       .in('status', ['active', 'paused']);
     if (error) throw error;
-    const matches = matchMembers(students, members.filter((m) => !m.isAdmin));
+    const matches = matchMembers(students, members);
     const unmatched = students.filter((s) => !matches.has(s.id)).map((s) => s.ig_handle);
     const report = {
       members: members.length, students: students.length, matched: matches.size,

@@ -12,13 +12,17 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
   const [mobile, setMobile] = useState(false);
   const [at, setAt] = useState(0);                 // desktop: spread index; mobile: page index
   const [turn, setTurn] = useState<Turn>(null);
+  // Pages whose stamps have already thudded on. A page that turns or lands again shows its stamps
+  // still, instead of making them vanish and re-stamp mid-turn (the glitch the client saw).
+  const [played, setPlayed] = useState<Set<number>>(() => new Set());
   const box = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; dir: 1 | -1 | 0; width: number } | null>(null);
   const anim = useRef(0);
+  const visibleNow = useRef<number[]>([]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
-    const set = () => { setMobile(mq.matches); setAt(0); };
+    const set = () => { setMobile(mq.matches); setAt(0); setPlayed(new Set()); };
     set();
     mq.addEventListener('change', set);
     return () => mq.removeEventListener('change', set);
@@ -38,6 +42,7 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
       if (p < 1) { setTurn({ dir, angle }); anim.current = requestAnimationFrame(step); return; }
       setTurn(null);
       if (done) setAt((a) => a + dir);
+      setPlayed((p) => new Set([...p, ...visibleNow.current]));
     };
     anim.current = requestAnimationFrame(step);
   }, []);
@@ -82,7 +87,10 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
   };
 
   const blank = <div className="guilloche h-full" />;
-  const page = (i: number) => pages[i] ?? blank;
+  // `still` = never animate (the turning leaf); otherwise only the first time the page is seen
+  const page = (i: number, still = false) => (
+    <div key={i} className={still || played.has(i) ? 'no-thud h-full' : 'h-full'}>{pages[i] ?? blank}</div>
+  );
   const shade = turn ? Math.sin((turn.angle * Math.PI) / 180) : 0;
 
   // What lies underneath, and which leaf is turning
@@ -90,7 +98,7 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
   if (mobile) {
     right = turn ? page(turn.dir === 1 ? at + 1 : at) : page(at);
     if (turn) {
-      const front = page(turn.dir === 1 ? at : at - 1);
+      const front = page(turn.dir === 1 ? at : at - 1, true);
       const deg = turn.dir === 1 ? -turn.angle : -180 + turn.angle;
       leaf = <Leaf origin="left" deg={deg} front={front} back={blank} shade={shade} />;
     }
@@ -98,10 +106,11 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
     const l = at * 2, r = l + 1;
     left = page(turn?.dir === -1 ? l - 2 : l);
     right = page(turn?.dir === 1 ? r + 2 : r);
-    if (turn?.dir === 1) leaf = <Leaf origin="left" deg={-turn.angle} front={page(r)} back={page(r + 1)} shade={shade} />;
-    if (turn?.dir === -1) leaf = <Leaf origin="right" deg={turn.angle} front={page(l)} back={page(l - 1)} shade={shade} />;
+    if (turn?.dir === 1) leaf = <Leaf origin="left" deg={-turn.angle} front={page(r, true)} back={page(r + 1, true)} shade={shade} />;
+    if (turn?.dir === -1) leaf = <Leaf origin="right" deg={turn.angle} front={page(l, true)} back={page(l - 1, true)} shade={shade} />;
   }
 
+  visibleNow.current = mobile ? [at, at + (turn?.dir ?? 0)] : [at * 2, at * 2 + 1, (at + (turn?.dir ?? 0)) * 2, (at + (turn?.dir ?? 0)) * 2 + 1];
   const label = mobile ? `Page ${at + 1} of ${pages.length}` : `Pages ${at * 2 + 1}–${at * 2 + 2} of ${pages.length}`;
   const arrow = (dir: 1 | -1) => (
     <button type="button" onClick={() => go(dir)} disabled={!can(dir)} aria-label={dir === 1 ? 'Next pages' : 'Previous pages'}
@@ -115,10 +124,15 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
       <div className="leather rounded-2xl p-2.5 sm:p-3">
         <div ref={box} className="book relative grid md:grid-cols-2 cursor-grab active:cursor-grabbing"
           onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-          {!mobile && <div className="relative edges-l rounded-l-lg overflow-hidden">{left}</div>}
+          {!mobile && (
+            <div className="relative edges-l rounded-l-lg overflow-hidden">
+              {left}
+              {turn?.dir === -1 && <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: shade * 0.18 }} />}
+            </div>
+          )}
           <div className={`relative overflow-hidden ${mobile ? 'edges-r rounded-lg' : 'edges-r rounded-r-lg'}`}>
             {right}
-            {turn && <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: shade * 0.18 }} />}
+            {turn && (mobile || turn.dir === 1) && <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: shade * 0.18 }} />}
           </div>
           {!mobile && (
             <>

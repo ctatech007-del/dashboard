@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cleanHandle, missingHandles, normalizePost, parseProfile, postType,
+  cleanHandle, missingHandles, missingOutcome, normalizePost, parseProfile, postType,
 } from '../supabase/functions/_shared/apify.ts';
 
 test('cleanHandle strips urls, @ and case', () => {
@@ -60,4 +60,11 @@ test('Reel views are the play count Instagram shows; the older view count is onl
   assert.equal(normalizePost({ ...reel, videoPlayCount: 51000, videoViewCount: 12000 }, 'riya')?.views, 51000);
   assert.equal(normalizePost({ ...reel, videoViewCount: 12000 }, 'riya')?.views, 12000);
   assert.equal(normalizePost({ ...reel }, 'riya')?.views, null);
+});
+
+test('a few missing profiles are "not found"; many at once mean the run stopped early', () => {
+  assert.equal(missingOutcome(1, 22).outcome, 'not_found');
+  assert.equal(missingOutcome(2, 22).outcome, 'not_found');
+  assert.equal(missingOutcome(6, 22).outcome, 'error');
+  assert.equal(missingOutcome(3, 5).outcome, 'error');
 });

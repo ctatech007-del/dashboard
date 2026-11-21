@@ -6,7 +6,7 @@
 import { authorized, datasetItems, db, errorText, fnUrl, json, startActor } from '../_shared/env.ts';
 import { alert } from '../_shared/alert.ts';
 import {
-  cleanHandle, missingHandles, normalizePost, parseProfile,
+  cleanHandle, missingHandles, missingOutcome, normalizePost, parseProfile,
   type NormalizedPost, type Outcome, type RawPost, type RawProfile,
 } from '../_shared/apify.ts';
 
@@ -116,10 +116,11 @@ async function ingestProfiles(runId: string, resource: { defaultDatasetId: strin
       new_posts: added });
   }
 
-  for (const h of missingHandles(students.map((s) => s.ig_handle), items)) {
+  const missing = missingHandles(students.map((s) => s.ig_handle), items);
+  const why = missingOutcome(missing.length, students.length);
+  for (const h of missing) {
     const s = byHandle.get(h)!;
-    results.push({ student_id: s.id, outcome: 'not_found', new_posts: 0,
-      detail: 'No profile returned: renamed, deleted or blocked' });
+    results.push({ student_id: s.id, outcome: why.outcome, new_posts: 0, detail: why.detail });
   }
   await writeResults(runId, results);
   if (snapshots.length) {

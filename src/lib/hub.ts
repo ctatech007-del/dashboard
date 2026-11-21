@@ -1,7 +1,12 @@
 import 'server-only';
 // The Hub runs without a login, so it only ever calls the hub_* database functions (exact handle,
 // active students only). Nothing here reads a table directly.
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+// No cookies: the Hub is public, and a cookie-free client lets its pages be cached (see revalidate).
+const db = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 export interface HubStudent {
   name: string; handle: string; member_since: string; total_posts: number; month_posts: number;
@@ -19,26 +24,22 @@ export interface HubBoards {
 }
 
 export async function hubStudent(handle: string): Promise<HubStudent | null> {
-  const db = await supabase();
-  const { data } = await db.rpc('hub_student', { h: handle });
+  const { data } = await db().rpc('hub_student', { h: handle });
   return (data as HubStudent | null) ?? null;
 }
 
 export async function hubBoards(): Promise<HubBoards> {
-  const db = await supabase();
-  const { data } = await db.rpc('hub_boards');
+  const { data } = await db().rpc('hub_boards');
   return (data as HubBoards) ?? { day: null, updated_at: null, follower_growth: [], viral: [], total_posts: [], total_posts_tied: [] };
 }
 
 export async function hubLookup(handle: string): Promise<string | null> {
-  const db = await supabase();
-  const { data } = await db.rpc('hub_lookup', { h: handle });
+  const { data } = await db().rpc('hub_lookup', { h: handle });
   return (data as string | null) ?? null;
 }
 
 /** Close matches for a handle that wasn't found ("did you mean"). */
 export async function hubSuggest(handle: string): Promise<string[]> {
-  const db = await supabase();
-  const { data } = await db.rpc('hub_suggest', { h: handle });
+  const { data } = await db().rpc('hub_suggest', { h: handle });
   return (data as string[] | null) ?? [];
 }

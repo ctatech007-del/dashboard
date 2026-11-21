@@ -22,13 +22,15 @@ export function instagramHandle(link: string | undefined): string | null {
 
 /**
  * Match students to Heartbeat members: the saved member id first, then email, then the Instagram
- * link on the member's profile. A member is never matched to two students.
+ * link on the member's profile. A member is never matched to two students. Admin (team) accounts
+ * can be linked by id or email (e.g. the client's own test students), never by an Instagram guess.
  */
 export function matchMembers(students: HbStudent[], members: HbMember[]) {
   const byId = new Map(members.map((m) => [m.id, m]));
   const byEmail = new Map(members.filter((m) => m.email).map((m) => [m.email!.toLowerCase(), m]));
   const byInsta = new Map<string, HbMember>();
   for (const m of members) {
+    if (m.isAdmin) continue;   // team accounts are only ever linked by id or an email the team entered
     const h = instagramHandle(m.socialLinks?.instagram);
     if (h && !byInsta.has(h)) byInsta.set(h, m);
   }

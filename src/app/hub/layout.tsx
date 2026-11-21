@@ -11,8 +11,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export const dynamic = 'force-dynamic';
-
 export default function HubLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`hub sky ${signature.variable} relative min-h-screen overflow-x-clip`}>

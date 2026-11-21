@@ -24,9 +24,11 @@ test('reward steps from the brief', () => {
   assert.deepEqual(REWARD_STEPS, [10, 15, 30, 35, 50, 55, 70, 75, 90, 95, 100]);
 });
 
-test('machine-readable lines in the client\'s format: 44 characters, accents folded', () => {
-  const [a, b] = mrz('Julian Bös', '2026-02-01', 11);
-  assert.equal(a, 'P<CRT<<JULIAN<BOS' + '<'.repeat(27));
+test('machine-readable lines in the client\'s format: 44 characters, the handle as one word', () => {
+  const [a, b] = mrz('petermckinnon', '2026-02-01', 11);
+  assert.equal(a, 'P<CRT<<PETERMCKINNON' + '<'.repeat(24));
+  assert.equal(mrz('creator.takeoff', '2026-02-01', 1)[0].slice(0, 22), 'P<CRT<<CREATORTAKEOFF<');
+  assert.equal(mrz('bös_travels', '2026-02-01', 1)[0].slice(0, 18), 'P<CRT<<BOSTRAVELS<');
   assert.equal(b, '11<22<<FEB2026<<CREATOR<TAKEOFF<ACADEMY' + '<'.repeat(5));
   assert.equal(a.length, 44);
   assert.equal(b.length, 44);

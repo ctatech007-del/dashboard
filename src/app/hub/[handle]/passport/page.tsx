@@ -1,8 +1,7 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { hubStudent } from '@/lib/hub';
 import { COLLECT_ROWS, mrz, passportOrder, placement, STAMP, STAMPS, visaPages } from '@/lib/stamps';
-import { Plane, Stamp, StudentHeader, Updated } from '@/components/hub';
+import { Plane, Stamp, RenameNote, StudentHeader, Updated } from '@/components/hub';
 import { Booklet } from '@/components/hub-booklet';
 import { CountUp } from '@/components/hub-fx';
 
@@ -20,16 +19,21 @@ function Paper({ n, visa, children }: { n: number; visa?: boolean; children: Rea
   );
 }
 
+// Cached for 5 minutes, like the Hub home (the data changes once a day)
+export const revalidate = 300;
+// Built on first visit, then served from the cache
+export async function generateStaticParams() { return []; }
+
 export default async function Passport({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
   const s = await hubStudent(decodeURIComponent(handle));
-  if (!s) redirect(`/hub?notfound=${encodeURIComponent(decodeURIComponent(handle))}`);   // same as a search that finds nothing
+  if (!s) redirect(`/hub/missing/${encodeURIComponent(decodeURIComponent(handle))}`);   // same as a search that finds nothing
   if (s.handle !== decodeURIComponent(handle)) redirect(`/hub/${s.handle}/passport`);
 
   const earned = passportOrder(s.stamps.filter((x) => STAMP.has(x.stamp)));   // Takeoff first, then oldest first
   const got = new Set(earned.map((x) => x.stamp));
   const since = new Date(`${s.member_since}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', month: 'short', year: 'numeric' });
-  const [mrz1, mrz2] = mrz(s.name, s.member_since, earned.length);
+  const [mrz1, mrz2] = mrz(s.handle, s.member_since, earned.length);
   // Capitalised as the client asked; names typed in lower case get capitals, "Eva zu Beck" stays as written
   const signature = s.name === s.name.toLowerCase()
     ? s.name.trim().split(/\s+/).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') : s.name.trim();
@@ -65,7 +69,7 @@ export default async function Passport({ params }: { params: Promise<{ handle: s
         </div>
         <div className="mt-3 sm:mt-4">
           <p className="text-[8px] sm:text-[10px] font-semibold tracking-[0.14em] uppercase text-[#8a7a68]">Signature of holder</p>
-          <p className="mt-1 border-b border-[#bfb09a] pb-0.5 text-3xl sm:text-5xl leading-tight text-[#25366a] truncate" style={{ fontFamily: 'var(--font-signature), cursive' }}>{signature}</p>
+          <p className="mt-4 sm:mt-6 border-b border-[#bfb09a] pb-0 text-3xl sm:text-5xl leading-[1.05] text-[#25366a] truncate" style={{ fontFamily: 'var(--font-signature), cursive' }}>{signature}</p>
         </div>
         <div className="mt-auto pt-2 font-mono text-[7.5px] sm:text-[10.5px] leading-relaxed tracking-[0.06em] text-[#3a3027] whitespace-nowrap overflow-hidden" aria-label="Passport machine-readable lines">
           <p>{mrz1}</p><p>{mrz2}</p>
@@ -131,9 +135,7 @@ export default async function Passport({ params }: { params: Promise<{ handle: s
         {got.size === STAMPS.length && <p className="mt-6 text-center font-bold">🏆 Every stamp collected. Legendary.</p>}
       </section>
 
-      <p className="on-sky text-center text-sm mt-7 md:whitespace-nowrap">
-        Changed your Instagram handle? <Link href="/hub/rename" className="font-bold underline">Tell us here</Link>, and your posts and passport stamps stay with you.
-      </p>
+      <RenameNote />
       <Updated at={s.updated_at} />
     </>
   );

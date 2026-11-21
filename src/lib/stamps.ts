@@ -53,15 +53,17 @@ export const REWARD_STEPS = [10, 15, 30, 35, 50, 55, 70, 75, 90, 95, 100];
 
 /**
  * Passport machine-readable lines, 44 characters each, as the client specified:
- * "P<CRT<<JULIAN<BOES<<<…" and "11<22<<FEB2026<<CREATOR<TAKEOFF<ACADEMY<<<…".
+ * "P<CRT<<PETERMCKINNON<<<…" and "11<22<<FEB2026<<CREATOR<TAKEOFF<ACADEMY<<<…".
+ * Line 1 uses the Instagram handle, not the person's name, as one word: dots and underscores are
+ * dropped, never turned into "<" (client, 18 Nov).
  */
-export function mrz(name: string, memberSince: string, stamps: number): [string, string] {
-  const clean = (s: string) => s.normalize('NFKD').replace(/[^A-Za-z0-9 ]/g, '').toUpperCase().trim();
+export function mrz(handle: string, memberSince: string, stamps: number): [string, string] {
+  const clean = (s: string) => s.normalize('NFKD').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   const pad = (s: string) => (s + '<'.repeat(44)).slice(0, 44);
   const since = new Date(`${memberSince.slice(0, 10)}T00:00:00Z`)
     .toLocaleDateString('en-GB', { timeZone: 'UTC', month: 'short', year: 'numeric' }).replace(' ', '').toUpperCase();
   return [
-    pad(`P<CRT<<${clean(name).split(/\s+/).filter(Boolean).join('<')}`),
+    pad(`P<CRT<<${clean(handle)}`),
     pad(`${stamps}<${STAMPS.length}<<${since}<<CREATOR<TAKEOFF<ACADEMY`),
   ];
 }
