@@ -28,7 +28,7 @@ export function ChallengeProgress({ total, posts }: { total: number; posts: numb
   const left = next ? next - posts : 0;
   return (
     <div className="text-center">
-      <p className="display text-5xl sm:text-6xl tnum"><span className="text-brand">{n}</span> / 100 posts</p>
+      <p className="display text-4xl sm:text-6xl tnum whitespace-nowrap"><span className="text-brand">{n}</span> / 100 posts</p>
       <div className="mx-auto mt-4 h-2.5 max-w-sm rounded-full bg-paper overflow-hidden" role="progressbar"
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={total} aria-label="Posts towards 100">
         <div className="h-full rounded-full bg-good" style={{ width: `${n}%` }} />
