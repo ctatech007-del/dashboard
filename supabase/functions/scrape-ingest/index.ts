@@ -3,7 +3,7 @@
 //   phase=overflow → ingest extra posts
 //   phase=views    → ingest Reel play counts (the profile scraper no longer returns views)
 // The last pass ends in finalize(): metrics, daily rollup, Google Sheet sync.
-import { authorized, datasetItems, db, errorText, fnUrl, json, startActor } from '../_shared/env.ts';
+import { FUNCTION_SECRET, authorized, datasetItems, db, errorText, fnUrl, json, startActor } from '../_shared/env.ts';
 import { alert } from '../_shared/alert.ts';
 import {
   cleanHandle, missingHandles, missingOutcome, normalizePost, parseProfile,
@@ -232,6 +232,15 @@ async function finalize(runId: string, warning: string | null) {
     status: 'done', profiles_ok: count ?? 0, error: warning,
     finished_at: new Date().toISOString(),
   }).eq('id', runId).select('profiles_total, trigger').single();
+
+  // The Hub caches its pages; clear them now so everyone sees today's numbers right away instead of
+  // yesterday's page until it refreshes (the "changed in the middle of the day" the client saw).
+  const app = Deno.env.get('APP_URL');
+  if (app) {
+    await fetch(`${app}/api/revalidate`, { method: 'POST', headers: { 'x-function-secret': FUNCTION_SECRET } })
+      .then(async () => { await fetch(`${app}/hub`).catch(() => null); })   // warm the home page
+      .catch(() => null);
+  }
 
   // Sheet sync is best-effort: a Sheets outage must not fail the scrape.
   const sync = await fetch(fnUrl('sheets-sync'), { method: 'POST' }).catch((e) => e);

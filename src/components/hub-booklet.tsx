@@ -12,17 +12,16 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
   const [mobile, setMobile] = useState(false);
   const [at, setAt] = useState(0);                 // desktop: spread index; mobile: page index
   const [turn, setTurn] = useState<Turn>(null);
-  // Pages whose stamps have already thudded on. A page that turns or lands again shows its stamps
-  // still, instead of making them vanish and re-stamp mid-turn (the glitch the client saw).
-  const [played, setPlayed] = useState<Set<number>>(() => new Set());
+  // Stamps thud on only when the passport opens (the client's rule). Once a page has been turned,
+  // every page shows its stamps already in place, so nothing pops in or vanishes while turning.
+  const [turned, setTurned] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; dir: 1 | -1 | 0; width: number } | null>(null);
   const anim = useRef(0);
-  const visibleNow = useRef<number[]>([]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
-    const set = () => { setMobile(mq.matches); setAt(0); setPlayed(new Set()); };
+    const set = () => { setMobile(mq.matches); setAt(0); };
     set();
     mq.addEventListener('change', set);
     return () => mq.removeEventListener('change', set);
@@ -33,6 +32,7 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
 
   /** Animate the turning page to 180° (done) or back to 0°. */
   const settle = useCallback((dir: 1 | -1, from: number, done: boolean) => {
+    setTurned(true);
     cancelAnimationFrame(anim.current);
     const to = done ? 180 : 0, t0 = performance.now(), ms = 260 + Math.abs(to - from) * 2;
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -42,7 +42,6 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
       if (p < 1) { setTurn({ dir, angle }); anim.current = requestAnimationFrame(step); return; }
       setTurn(null);
       if (done) setAt((a) => a + dir);
-      setPlayed((p) => new Set([...p, ...visibleNow.current]));
     };
     anim.current = requestAnimationFrame(step);
   }, []);
@@ -78,6 +77,7 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     }
     const dir = d.dir as 1 | -1;
+    setTurned(true);
     setTurn({ dir, angle: Math.max(0, Math.min(180, (-dir * dx / d.width) * 180)) });
   };
   const up = () => {
@@ -89,7 +89,7 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
   const blank = <div className="guilloche h-full" />;
   // `still` = never animate (the turning leaf); otherwise only the first time the page is seen
   const page = (i: number, still = false) => (
-    <div key={i} className={still || played.has(i) ? 'no-thud h-full' : 'h-full'}>{pages[i] ?? blank}</div>
+    <div key={i} className={still || turned ? 'no-thud h-full' : 'h-full'}>{pages[i] ?? blank}</div>
   );
   const shade = turn ? Math.sin((turn.angle * Math.PI) / 180) : 0;
 
@@ -110,7 +110,6 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
     if (turn?.dir === -1) leaf = <Leaf origin="right" deg={turn.angle} front={page(l, true)} back={page(l - 1, true)} shade={shade} />;
   }
 
-  visibleNow.current = mobile ? [at, at + (turn?.dir ?? 0)] : [at * 2, at * 2 + 1, (at + (turn?.dir ?? 0)) * 2, (at + (turn?.dir ?? 0)) * 2 + 1];
   const label = mobile ? `Page ${at + 1} of ${pages.length}` : `Pages ${at * 2 + 1}–${at * 2 + 2} of ${pages.length}`;
   const arrow = (dir: 1 | -1) => (
     <button type="button" onClick={() => go(dir)} disabled={!can(dir)} aria-label={dir === 1 ? 'Next pages' : 'Previous pages'}

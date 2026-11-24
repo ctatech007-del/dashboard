@@ -9,20 +9,17 @@ export function HubTitle({ children }: { children: React.ReactNode }) {
 export function Updated({ at }: { at: string | null }) {
   return (
     <p className="on-sky text-xs mt-8 flex items-center gap-1.5">
-      <span aria-hidden>🔄</span>{at ? `Updated ${updatedAt(at)} · updates every day at 6:00 IST` : 'Not updated yet'}
+      <span aria-hidden>🔄</span>{at ? `Updated ${updatedAt(at)}` : 'Not updated yet'}
     </p>
   );
 }
 
-/** "today, 06:02 IST" / "yesterday, 06:02 IST" / "19 Nov, 06:02 IST" */
+/** "24 Nov, 06:02 IST": a fixed date and time, so a cached page can never say "today" on the wrong day. */
 export function updatedAt(ts: string) {
-  const ist = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-  const t = new Date(ts), now = new Date();
+  const t = new Date(ts);
+  const date = t.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
   const time = t.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
-  const when = ist(t) === ist(now) ? 'today'
-    : ist(t) === ist(new Date(now.getTime() - 864e5)) ? 'yesterday'
-      : t.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
-  return `${when}, ${time} IST`;
+  return `${date}, ${time} IST`;
 }
 
 /** The handle-change note under a student's pages, as a dark pill like the client's version. */

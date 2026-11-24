@@ -19,7 +19,7 @@ export async function middleware(req: NextRequest) {
   );
   const { data } = await db.auth.getUser();
   // The Student Hub is public: it reads only through the hub_* database functions.
-  const open = ['/login', '/hub'].some((p) => req.nextUrl.pathname === p || req.nextUrl.pathname.startsWith(`${p}/`));
+  const open = ['/login', '/hub', '/api/revalidate'].some((p) => req.nextUrl.pathname === p || req.nextUrl.pathname.startsWith(`${p}/`));
   if (!data.user && !open) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
