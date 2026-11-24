@@ -89,7 +89,7 @@ export function Booklet({ pages }: { pages: React.ReactNode[] }) {
   const blank = <div className="guilloche h-full" />;
   // `still` = never animate (the turning leaf); otherwise only the first time the page is seen
   const page = (i: number, still = false) => (
-    <div key={i} className={still || turned ? 'no-thud h-full' : 'h-full'}>{pages[i] ?? blank}</div>
+    <div key={i} className={`guilloche h-full ${still || turned ? 'no-thud' : ''}`}>{pages[i] ?? blank}</div>
   );
   const shade = turn ? Math.sin((turn.angle * Math.PI) / 180) : 0;
 

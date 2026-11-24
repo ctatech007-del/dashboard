@@ -10,7 +10,7 @@ const THUD_MS = 140;
 /** One passport page: cream security paper, the academy name on top, a page number from page 2. */
 function Paper({ n, visa, children }: { n: number; visa?: boolean; children: React.ReactNode }) {
   return (
-    <div className="guilloche relative aspect-[10/13] min-h-full w-full px-5 pt-4 pb-7 sm:px-6">
+    <div className="guilloche relative aspect-[10/13] w-full px-5 pt-4 pb-7 sm:px-6">
       <p className="text-center text-[9px] sm:text-[11px] font-bold tracking-[0.25em] uppercase text-[#7d6e5d]">Creator Takeoff Academy</p>
       {visa && <Plane className="pointer-events-none absolute left-1/2 top-1/2 size-[60%] -translate-x-1/2 -translate-y-1/2 rotate-45 text-[#2b2119] opacity-[0.045]" />}
       {children}
