@@ -47,7 +47,7 @@ export default async function Passport({ params }: { params: Promise<{ handle: s
 
   const dataPage = (
     <Paper n={1} key="p1">
-      <div className="mt-2 sm:mt-3 flex h-[calc(100%-1.5rem)] flex-col">
+      <div className="mt-2 sm:mt-3 flex h-[calc(100%-1.5rem)] sm:h-[calc(100%-1.875rem)] flex-col">
         <p className="flex items-center gap-2.5 font-extrabold tracking-[0.12em] text-sm sm:text-lg pb-2.5 border-b border-[#d8cbb5]">
           <span className="grid place-items-center size-7 sm:size-9 rounded-full border-2 border-[#a8812a] text-[#a8812a] shadow-[inset_0_0_0_2px_#f5ecdc,inset_0_0_0_3px_#a8812a]">
             <Plane className="size-3 sm:size-4 rotate-90" />
