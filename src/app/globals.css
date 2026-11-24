@@ -206,10 +206,18 @@ body {
 .glow { box-shadow: 0 0 0 3px #e3a92b, 0 0 22px 4px rgba(227, 169, 43, 0.55); }
 
 /* Milestone circles: a gold ring whose glow breathes, staggered so they don't pulse in step */
-.gold-pulse { box-shadow: 0 0 0 3px #e3a92b, 0 0 10px 2px rgba(227, 169, 43, 0.45); animation: gold-pulse 2.4s ease-in-out infinite; }
+.gold-pulse { box-shadow: 0 0 0 3px #e3a92b, 0 0 10px 2px rgba(227, 169, 43, 0.45); animation: gold-pulse 1.8s ease-in-out infinite; }
 @keyframes gold-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px #e3a92b, 0 0 8px 1px rgba(227, 169, 43, 0.35); }
-  50% { box-shadow: 0 0 0 3px #f2c45a, 0 0 22px 7px rgba(242, 196, 90, 0.75); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 3px #e3a92b, 0 0 6px 1px rgba(227, 169, 43, 0.4); }
+  50% { transform: scale(1.09); box-shadow: 0 0 0 4px #ffd36b, 0 0 28px 10px rgba(255, 196, 70, 0.85); }
+}
+/* The gift inside a reward circle gives a little shake now and then */
+.gift-wiggle { display: inline-block; animation: gift-wiggle 1.8s ease-in-out infinite; animation-delay: inherit; }
+@keyframes gift-wiggle {
+  0%, 55%, 100% { transform: rotate(0) scale(1); }
+  65% { transform: rotate(-16deg) scale(1.15); }
+  75% { transform: rotate(13deg) scale(1.15); }
+  85% { transform: rotate(-7deg) scale(1.05); }
 }
 /* The next reward chip: orange and pulsing */
 .next-pulse { animation: next-pulse 1.6s ease-in-out infinite; }
