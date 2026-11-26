@@ -67,18 +67,19 @@ export default async function Passport({ params }: { params: Promise<{ handle: s
             {field('Issued by', 'Creator Takeoff Academy')}
           </div>
         </div>
-        <div className="mt-3 sm:mt-4">
+        <div className="mt-3 sm:mt-4 flex flex-1 flex-col">
           <p className="text-[8px] sm:text-[10px] font-semibold tracking-[0.14em] uppercase text-[#8a7a68]">Signature of holder</p>
-          {/* The line is in the same place for every name; the signature sits on the line (a real
-              signature), never clipped (long names get a smaller hand so they fit) */}
-          <div className="mt-3 sm:mt-4 flex h-[2.6rem] sm:h-[4.3rem] items-end border-b border-[#bfb09a]">
+          {/* The signature sits under the label, the same place for every name, never clipped (long names
+              get a smaller hand so they fit); its line runs just above the passport code */}
+          <div className="mt-3 sm:mt-4 flex h-[2.6rem] sm:h-[4.3rem] items-end">
             <p className="whitespace-nowrap leading-[1.2] text-[#25366a] text-[length:calc(var(--sig)*var(--fit))] [--sig:1.85rem] sm:[--sig:3rem]"
               style={{ fontFamily: 'var(--font-signature), cursive', '--fit': Math.min(1, 15 / Math.max(signature.length, 1)) } as React.CSSProperties}>
               {signature}
             </p>
           </div>
+          <div className="mt-auto border-b border-[#bfb09a]" />
         </div>
-        <div className="mt-auto pt-2 font-mono text-[7.5px] sm:text-[10.5px] leading-relaxed tracking-[0.06em] text-[#3a3027] whitespace-nowrap overflow-hidden" aria-label="Passport machine-readable lines">
+        <div className="pt-2 font-mono text-[7.5px] sm:text-[10.5px] leading-relaxed tracking-[0.06em] text-[#3a3027] whitespace-nowrap overflow-hidden" aria-label="Passport machine-readable lines">
           <p>{mrz1}</p><p>{mrz2}</p>
         </div>
       </div>
