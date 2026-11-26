@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { supabase, teamClient } from '@/lib/supabase';
 import { istToCron, parseCsv } from '@/lib/format';
 import { callFunction } from '@/lib/functions';
+import { REWARD_STEPS } from '@/lib/stamps';
 
 export type FormState = { error?: string; message?: string } | undefined;
 
@@ -282,11 +283,18 @@ export async function saveSettings(_: FormState, form: FormData): Promise<FormSt
   const reward_messages = form.get('reward_messages') === 'on';
   const reward_message = String(form.get('reward_message') ?? '').trim();
   if (reward_messages && !reward_message) return { error: 'Write the reward message before switching it on.' };
+  const reward_links: Record<string, string> = {};
+  for (const n of REWARD_STEPS) {
+    const v = String(form.get(`reward_link_${n}`) ?? '').trim();
+    if (!v) continue;
+    if (!/^https?:\/\/\S+$/.test(v)) return { error: `The prize link for post ${n} doesn’t look like a web address.` };
+    reward_links[String(n)] = v;
+  }
 
   const { error } = await db.from('settings').update({
     streak_threshold: threshold,
     milestones: [...new Set(milestones)].sort((a, b) => a - b),
-    sheet_id, scrape_cron, alert_emails, reward_messages, ...(reward_message ? { reward_message } : {}),
+    sheet_id, scrape_cron, alert_emails, reward_messages, reward_links, ...(reward_message ? { reward_message } : {}),
     updated_at: new Date().toISOString(),
   }).eq('id', 1);
   if (error) return { error: error.message };

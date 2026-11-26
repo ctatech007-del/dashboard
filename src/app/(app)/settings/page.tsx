@@ -1,3 +1,4 @@
+import { REWARD_STEPS } from '@/lib/stamps';
 import { teamClient } from '@/lib/supabase';
 import { saveSettings } from '@/app/actions';
 import { ActionForm } from '@/components/forms';
@@ -52,11 +53,26 @@ export default async function Settings() {
               </label>
               <label className="block">
                 <span className="block text-ink-soft mb-1">
-                  Message. <code>{'{name}'}</code> becomes their first name, <code>{'{step}'}</code> the number of posts.
+                  Message. <code>{'{first_name}'}</code> becomes their first name, <code>{'{step}'}</code> the number of
+                  posts, and <code>{'{claim}'}</code> a “Click here to claim it” link to that milestone’s prize (below).
                   Leave a blank line for a new paragraph.
                 </span>
-                <textarea name="reward_message" rows={4} defaultValue={cfg?.reward_message ?? ''} className="field" />
+                <textarea name="reward_message" rows={9} defaultValue={cfg?.reward_message ?? ''} className="field" />
               </label>
+              <div>
+                <span className="block text-ink-soft mb-1">
+                  Prize link for each milestone. A reward without a link isn’t sent until you add one.
+                </span>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {REWARD_STEPS.map((n) => (
+                    <label key={n} className="flex items-center gap-2">
+                      <span className="w-16 shrink-0 tnum">Post {n}</span>
+                      <input name={`reward_link_${n}`} type="url" placeholder="https://…" className="field"
+                        defaultValue={((cfg?.reward_links ?? {}) as Record<string, string>)[String(n)] ?? ''} />
+                    </label>
+                  ))}
+                </div>
+              </div>
               <p className="text-xs text-ink-soft">
                 Sent as a direct message from the account that created the Heartbeat API key. Each reward is sent once,
                 within 3 hours of reaching it, and logged on the Rewards page. Students not linked to Heartbeat get none.

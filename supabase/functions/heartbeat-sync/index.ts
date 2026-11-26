@@ -1,7 +1,7 @@
 // Every 3 hours: match students to Heartbeat members, record "last seen" and active days, and (when
 // switched on in Settings) send reward messages. POST {"dry": true} only reads and reports.
 import { authorized, db, errorText, json } from '../_shared/env.ts';
-import { type HbMember, istDay, matchMembers, rewardMessage } from '../_shared/heartbeat.ts';
+import { type HbMember, istDay, matchMembers, rewardMessage, rewardReady } from '../_shared/heartbeat.ts';
 
 const API = 'https://api.heartbeat.chat/v0';
 const KEY = Deno.env.get('HEARTBEAT_API_KEY');
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     const report = {
       members: members.length, students: students.length, matched: matches.size,
       by: Object.fromEntries(['id', 'email', 'instagram'].map((v) => [v, [...matches.values()].filter((m) => m.via === v).length])),
-      unmatched, logins: 0, messages: 0,
+      unmatched, logins: 0, messages: 0, held: 0,
     };
     if (dry) return json({ dry: true, ...report });
 
@@ -55,16 +55,18 @@ Deno.serve(async (req) => {
     }
 
     // Reward messages: only when switched on, only for fresh rewards (no backlog), never twice.
-    const { data: cfg } = await db.from('settings').select('reward_messages, reward_message').single();
+    const { data: cfg } = await db.from('settings').select('reward_messages, reward_message, reward_links').single();
     if (cfg?.reward_messages) {
       const { data: due } = await db.from('rewards')
         .select('student_id, step, students!inner(name, heartbeat_user_id)')
         .is('sent_at', null).not('students.heartbeat_user_id', 'is', null)
         .gte('reached_at', new Date(Date.now() - 3 * 864e5).toISOString());
+      const links = (cfg.reward_links ?? {}) as Record<string, string>;
       for (const r of due ?? []) {
         const st = r.students as unknown as { name: string; heartbeat_user_id: string };
+        if (!rewardReady(cfg.reward_message, links, r.step)) { report.held++; continue; }   // no prize link yet
         await hb('/directMessages', {
-          method: 'PUT', body: JSON.stringify({ to: st.heartbeat_user_id, text: rewardMessage(cfg.reward_message, st.name, r.step) }),
+          method: 'PUT', body: JSON.stringify({ to: st.heartbeat_user_id, text: rewardMessage(cfg.reward_message, st.name, r.step, links[String(r.step)]) }),
         });
         await db.from('rewards').update({ sent_at: new Date().toISOString(), sent_by: 'Heartbeat (automatic)' })
           .eq('student_id', r.student_id).eq('step', r.step).is('sent_at', null);

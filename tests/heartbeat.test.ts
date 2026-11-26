@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { instagramHandle, istDay, matchMembers, rewardMessage } from '../supabase/functions/_shared/heartbeat.ts';
+import { instagramHandle, istDay, matchMembers, rewardMessage, rewardReady } from '../supabase/functions/_shared/heartbeat.ts';
 
 const student = (id: string, ig: string, email: string | null = null, hb: string | null = null) =>
   ({ id, ig_handle: ig, email, heartbeat_user_id: hb, name: id });
@@ -43,4 +43,16 @@ test('logins become IST days', () => {
 test('reward message: first name, step, rich text, no HTML injection', () => {
   assert.equal(rewardMessage('Hi {name}! {step} posts <3\n\nClaim it here.', 'Riya Sharma', 15),
     '<p>Hi Riya! 15 posts &lt;3</p><p>Claim it here.</p>');
+});
+
+test('reward message as the client wrote it: {first_name}, post number and the prize link', () => {
+  const t = 'Hi {first_name},\n\nCongrats on reaching post #{step}!\n\nHere\'s your prize 🎁 👉 {claim}';
+  assert.equal(rewardMessage(t, 'Riya Sharma', 30, 'https://travelamore.notion.site/p/Music?x=1&y=2'),
+    '<p>Hi Riya,</p><p>Congrats on reaching post #30!</p>'
+    + '<p>Here\'s your prize 🎁 👉 <a href="https://travelamore.notion.site/p/Music?x=1&amp;y=2">Click here to claim it</a></p>');
+  assert.equal(rewardMessage('Hi {{first_name}}', 'Riya Sharma', 10), '<p>Hi Riya</p>');
+  // Held back until that milestone has a prize link
+  assert.equal(rewardReady(t, { 10: 'https://a' }, 10), true);
+  assert.equal(rewardReady(t, { 10: 'https://a' }, 35), false);
+  assert.equal(rewardReady('No link here', {}, 35), true);
 });

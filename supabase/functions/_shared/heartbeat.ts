@@ -56,9 +56,21 @@ export function matchMembers(students: HbStudent[], members: HbMember[]) {
 export const istDay = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
 /** Reward message: {name} → first name, {step} → posts; plain text becomes Heartbeat rich text. */
-export function rewardMessage(template: string, name: string, step: number) {
+/**
+ * The reward message for one student and milestone, as Heartbeat HTML. In the text: {first_name} (or
+ * {name}, {{first_name}}) is their first name, {step} the number of posts, and {claim} becomes a
+ * "Click here to claim it" link to that milestone's prize. A blank line starts a new paragraph.
+ */
+export function rewardMessage(template: string, name: string, step: number, link?: string) {
   const first = name.trim().split(/\s+/)[0] || name;
-  const text = template.replaceAll('{name}', first).replaceAll('{step}', String(step));
-  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return text.split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const text = esc(template.replaceAll('{{first_name}}', first).replaceAll('{first_name}', first)
+    .replaceAll('{name}', first).replaceAll('{step}', String(step)));
+  const claim = link ? `<a href="${esc(link)}">Click here to claim it</a>` : 'Click here to claim it';
+  return text.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>').replaceAll('{claim}', claim)}</p>`).join('');
+}
+
+/** A reward can go out once its text needs no link, or its milestone has one. */
+export function rewardReady(template: string, links: Record<string, string>, step: number) {
+  return !template.includes('{claim}') || Boolean(links[String(step)]?.trim());
 }
