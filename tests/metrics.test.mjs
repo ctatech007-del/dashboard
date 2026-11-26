@@ -523,3 +523,37 @@ test('stamps: a simulated year, day by day with a dummy clock, gives every stamp
   // The simulation undoes itself: nothing is left behind
   assert.equal((await one(`select count(*)::int n from students where ig_handle = 'zz_clock_test_sim'`)).n, 0);
 });
+
+test('ties: #1 only when alone at the top, Top 3 only when no more than three are at or above you', async () => {
+  const ids = [];
+  for (let i = 0; i < 6; i++) ids.push(await student(`Tie ${i}`, `tie_kid_${i}`, 'Ties', '2026-11-01'));
+  const day = '2026-12-01';
+  // Day one: five people share 1 post, one has none. Nobody is alone at #1, more than 3 share it.
+  const rows = [[ids[0], 1], [ids[1], 1], [ids[2], 1], [ids[3], 1], [ids[4], 1], [ids[5], 0]];
+  for (const [sid, v] of rows) await db.query(`insert into ranking_snapshots (day, board, item, rank, student_id, value)
+    values ($1, 'total_posts', $2::text, $3, $2::uuid, $4)`, [day, sid, v ? 1 : 6, v]);
+  // Next day: two share #1, one is 3rd, the rest behind
+  const day2 = '2026-12-02';
+  const r2 = [[ids[0], 5, 1], [ids[1], 5, 1], [ids[2], 4, 3], [ids[3], 2, 4], [ids[4], 2, 4], [ids[5], 1, 6]];
+  for (const [sid, v, rk] of r2) await db.query(`insert into ranking_snapshots (day, board, item, rank, student_id, value)
+    values ($1, 'total_posts', $2::text, $3, $2::uuid, $4)`, [day2, sid, rk, v]);
+  await db.exec(`select award_stamps()`);
+  const got = async (sid) => (await stampsOf(sid)).map((x) => x.stamp).filter((k) => k === 'captain' || k === 'first_captain');
+  assert.deepEqual(await got(ids[0]), ['captain']);
+  assert.deepEqual(await got(ids[1]), ['captain']);
+  assert.deepEqual(await got(ids[2]), ['captain']);
+  assert.deepEqual(await got(ids[3]), []);
+  assert.deepEqual(await got(ids[5]), []);
+  // Alone at #1 on day three: that one gets #1
+  await db.query(`insert into ranking_snapshots (day, board, item, rank, student_id, value) values ('2026-12-03', 'total_posts', $1::text, 1, $1::uuid, 9)`, [ids[3]]);
+  await db.exec(`select award_stamps()`);
+  assert.deepEqual(await got(ids[3]), ['captain', 'first_captain']);
+});
+
+test('reward messages: switching them on records when, for held messages to go out later', async () => {
+  await db.exec(`update settings set reward_messages = false where id = 1`);
+  await db.exec(`update settings set reward_messages = true where id = 1`);
+  const s = await one(`select reward_messages_since from settings where id = 1`);
+  assert.ok(s.reward_messages_since);
+  await db.exec(`update settings set reward_messages = false where id = 1`);
+});

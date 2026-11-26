@@ -75,7 +75,8 @@ export default async function Settings() {
               </div>
               <p className="text-xs text-ink-soft">
                 Sent as a direct message from the account that created the Heartbeat API key. Each reward is sent once,
-                within 3 hours of reaching it, and logged on the Rewards page. Students not linked to Heartbeat get none.
+                within 3 hours of the daily update that counts it (or of adding its prize link, if that comes later), and
+                logged on the Rewards page. Students not linked to Heartbeat get none.
               </p>
             </fieldset>
             <label className="block text-sm">

@@ -54,13 +54,15 @@ Deno.serve(async (req) => {
       report.logins = logins.length;
     }
 
-    // Reward messages: only when switched on, only for fresh rewards (no backlog), never twice.
-    const { data: cfg } = await db.from('settings').select('reward_messages, reward_message, reward_links').single();
+    // Reward messages: only when switched on, never twice, and only for rewards reached since then (plus
+    // 3 days before, for the day they were switched on). One held back for a missing prize link goes out
+    // as soon as the link is added, however late.
+    const { data: cfg } = await db.from('settings').select('reward_messages, reward_message, reward_links, reward_messages_since').single();
     if (cfg?.reward_messages) {
       const { data: due } = await db.from('rewards')
         .select('student_id, step, students!inner(name, heartbeat_user_id)')
         .is('sent_at', null).not('students.heartbeat_user_id', 'is', null)
-        .gte('reached_at', new Date(Date.now() - 3 * 864e5).toISOString());
+        .gte('reached_at', new Date(Date.parse(cfg.reward_messages_since ?? new Date().toISOString()) - 3 * 864e5).toISOString());
       const links = (cfg.reward_links ?? {}) as Record<string, string>;
       for (const r of due ?? []) {
         const st = r.students as unknown as { name: string; heartbeat_user_id: string };
