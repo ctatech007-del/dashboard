@@ -205,23 +205,24 @@ body {
 /* Glow around the trophy and the next reward */
 .glow { box-shadow: 0 0 0 3px #e3a92b, 0 0 22px 4px rgba(227, 169, 43, 0.55); }
 
-/* Milestone circles, as in the client's version: a gold ring with a shine that travels round it
-   (brighter in some spots than others), a soft glow, bigger on hover, and a gift that wiggles. */
-.gold-ring { position: relative; box-shadow: 0 0 12px 2px rgba(227, 169, 43, 0.5); transition: transform 0.2s ease; }
+/* Milestone circles, as in the client's version: a thin gold ring with a soft glow that is brighter on
+   one side and travels round it, bigger on hover, and a gift (or trophy) that pops. */
+.gold-ring { position: relative; box-shadow: 0 0 0 2px #e8b443, 0 0 8px 1px rgba(232, 180, 67, 0.35); transition: transform 0.2s ease; }
 .gold-ring:hover { transform: scale(1.14); z-index: 2; }
 .gold-ring::before {
-  content: ""; position: absolute; inset: -3px; border-radius: 9999px; padding: 3px; pointer-events: none;
-  background: conic-gradient(#b07d22, #ffe7a0, #f2c14e 18%, #b07d22 38%, #e3a92b 55%, #fff1c2 68%, #c8922a 82%, #b07d22);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
-  animation: ring-spin 3s linear infinite; animation-delay: inherit;
+  content: ""; position: absolute; inset: -9px; border-radius: 9999px; pointer-events: none;
+  background: conic-gradient(rgba(255, 216, 110, 0.95), rgba(240, 190, 80, 0.35) 25%, rgba(240, 190, 80, 0.05) 50%, rgba(240, 190, 80, 0.35) 75%, rgba(255, 216, 110, 0.95));
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 9px), #000 calc(100% - 8px), transparent);
+  mask: radial-gradient(closest-side, transparent calc(100% - 9px), #000 calc(100% - 8px), transparent);
+  filter: blur(2px); animation: ring-spin 2.6s linear infinite; animation-delay: inherit;
 }
 @keyframes ring-spin { to { transform: rotate(360deg); } }
-.gift-wiggle { display: inline-block; animation: gift-wiggle 1.8s ease-in-out infinite; animation-delay: inherit; }
-@keyframes gift-wiggle {
-  0%, 55%, 100% { transform: rotate(0) scale(1); }
-  65% { transform: rotate(-16deg) scale(1.15); }
-  75% { transform: rotate(13deg) scale(1.15); }
-  85% { transform: rotate(-7deg) scale(1.05); }
+.gift-pop { display: inline-block; animation: gift-pop 1.6s ease-in-out infinite; animation-delay: inherit; }
+@keyframes gift-pop {
+  0%, 60%, 100% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(-2px) scale(1.3); }
+  32% { transform: translateY(0) scale(0.92); }
+  44% { transform: translateY(-1px) scale(1.1); }
 }
 /* The next reward chip: orange and pulsing */
 .next-pulse { animation: next-pulse 1.6s ease-in-out infinite; }
@@ -281,8 +282,8 @@ body {
 .gift-open { animation: gift-open 1.1s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
 @keyframes gift-open { 0% { transform: scale(1); } 40% { transform: scale(1.35) rotate(-14deg); } 100% { transform: scale(1); } }
 .gift-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; overflow: hidden; pointer-events: none;
-  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); background: rgba(255, 244, 228, 0.18); animation: gift-overlay 3.6s ease forwards; }
-@keyframes gift-overlay { 0% { opacity: 0; } 8%, 82% { opacity: 1; } 100% { opacity: 0; } }
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); background: rgba(255, 244, 228, 0.18); animation: gift-overlay 4.6s ease forwards; }
+@keyframes gift-overlay { 0% { opacity: 0; } 6%, 86% { opacity: 1; } 100% { opacity: 0; } }
 .gift-box { position: relative; width: 150px; height: 120px; animation: box-in 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both, box-shake 0.45s 0.55s ease-in-out 2; }
 .gift-box .body { position: absolute; inset: 36px 8px 0; border-radius: 10px; background: linear-gradient(#f59a3c, #e7781f); box-shadow: inset 0 -8px 0 rgba(0, 0, 0, 0.12), 0 18px 30px -12px rgba(120, 50, 0, 0.5); }
 .gift-box .body::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 22px; transform: translateX(-50%); background: #f7d47e; }
@@ -294,7 +295,7 @@ body {
 @keyframes box-in { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes box-shake { 25% { transform: rotate(-7deg); } 75% { transform: rotate(7deg); } }
 @keyframes lid-off { to { transform: translate(46px, -190px) rotate(38deg); opacity: 0; } }
-.gift-fly { position: absolute; left: 50%; top: 50%; opacity: 0; line-height: 1; animation: gift-fly 1.9s cubic-bezier(0.15, 0.7, 0.3, 1) forwards; }
+.gift-fly { position: absolute; left: 50%; top: 50%; opacity: 0; line-height: 1; animation: gift-fly 2.6s cubic-bezier(0.12, 0.65, 0.35, 1) forwards; }
 @keyframes gift-fly {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
   8% { opacity: 1; }
