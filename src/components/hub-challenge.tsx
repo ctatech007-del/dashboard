@@ -86,7 +86,7 @@ export function PostGrid({ total, handle, recent }: { total: number; handle: str
           let look: string, body: React.ReactNode = n;
           if (gift && (!done || open)) {
             look = `bg-[var(--hub-navy)] gold-ring ${open ? 'gift-open' : ''}`;
-            body = <span className="gift-pop text-sm sm:text-lg">🎁</span>;
+            body = <span className="text-sm sm:text-lg">🎁</span>;
           } else if (done) {
             look = `bg-good text-white shadow-[inset_0_-3px_0_rgba(0,0,0,0.15)] ${gift ? 'ring-2 sm:ring-[3px] ring-gold' : ''}`;
             body = check('size-3 sm:size-5');
@@ -104,7 +104,7 @@ export function PostGrid({ total, handle, recent }: { total: number; handle: str
       </ol>
       <div className="mt-6 sm:mt-8 flex flex-col items-center" title="Post 100: the finish line">
         <span className={`grid place-items-center size-20 sm:size-28 rounded-full text-white ${done100 ? 'bg-good glow' : 'bg-[var(--hub-navy)] gold-ring'}`}>
-          {done100 ? check('size-9 sm:size-12') : <span className="gift-pop text-4xl sm:text-5xl">🏆</span>}
+          {done100 ? check('size-9 sm:size-12') : <span className="text-4xl sm:text-5xl">🏆</span>}
         </span>
         <span className="mt-2.5 text-xs sm:text-sm font-extrabold tracking-[0.18em] uppercase text-[#c8962a]">Post 100</span>
       </div>

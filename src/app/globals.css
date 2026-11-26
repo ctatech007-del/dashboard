@@ -206,7 +206,7 @@ body {
 .glow { box-shadow: 0 0 0 3px #e3a92b, 0 0 22px 4px rgba(227, 169, 43, 0.55); }
 
 /* Milestone circles, as in the client's version: navy circle, thin white line, a thick shiny gold ring
-   whose shine travels round, a soft gold glow outside, bigger on hover, and a gift (or trophy) that pops. */
+   whose shine travels round, a soft gold glow outside, bigger on hover. The gift (or trophy) inside stays still. */
 .gold-ring { position: relative; box-shadow: 0 0 0 2px #fdf6e8; transition: transform 0.2s ease; }
 .gold-ring:hover { transform: scale(1.14); z-index: 2; }
 .gold-ring::before, .gold-ring::after { content: ""; position: absolute; border-radius: 9999px; pointer-events: none; }
@@ -226,13 +226,6 @@ body {
 }
 @keyframes ring-spin { to { transform: rotate(360deg); } }
 @keyframes ring-glow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-.gift-pop { display: inline-block; animation: gift-pop 1.4s cubic-bezier(0.3, 1.5, 0.5, 1) infinite; animation-delay: inherit; }
-@keyframes gift-pop {
-  0%, 55%, 100% { transform: translateY(0) scale(1); }
-  15% { transform: translateY(-5px) scale(1.5); }
-  28% { transform: translateY(0) scale(0.9); }
-  40% { transform: translateY(-2px) scale(1.15); }
-}
 /* The next reward chip: orange and pulsing */
 .next-pulse { animation: next-pulse 1.6s ease-in-out infinite; }
 @keyframes next-pulse {
