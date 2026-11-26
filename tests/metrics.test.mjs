@@ -508,3 +508,18 @@ test('views stamps come the day a Reel passes the mark, before its day-7 count',
     where student_id = $1 and stamp = 'wonder_of_the_world'`, [s]);
   assert.equal(w.d, '2026-11-14');
 });
+
+test('stamps: a simulated year, day by day with a dummy clock, gives every stamp on its exact day', async () => {
+  const { readFileSync } = await import('node:fs');
+  const sql = readFileSync(new URL('./stamps-year.sql', import.meta.url), 'utf8');
+  let msg = '';
+  try { await db.exec(sql); } catch (e) { msg = e.message; }
+  assert.match(msg, /^STAMP_SIM /, msg);
+  const out = JSON.parse(msg.slice('STAMP_SIM '.length));
+  const wrong = Object.entries(out.result).filter(([, v]) => v.dated !== v.expected || v.appeared !== v.expected);
+  assert.deepEqual(wrong, [], JSON.stringify(wrong));
+  assert.equal(out.stamps, 22);
+  assert.equal(out.removed, 0);
+  // The simulation undoes itself: nothing is left behind
+  assert.equal((await one(`select count(*)::int n from students where ig_handle = 'zz_clock_test_sim'`)).n, 0);
+});
