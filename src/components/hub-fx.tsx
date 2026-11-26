@@ -63,7 +63,7 @@ export function giftCelebration(done: () => void) {
       <rect x="4" y="62" width="162" height="8" rx="4" fill="#e48a33"/>
       <rect x="74" y="44" width="22" height="26" fill="#f6d98c"/>
     </g></svg></div>`;
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < 180; i++) {
     const e = document.createElement('span');
     e.className = 'gift-fly';
     e.textContent = TRAVEL[i % TRAVEL.length];
