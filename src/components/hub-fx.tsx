@@ -41,6 +41,31 @@ export function burst() {
   }
 }
 
+const TRAVEL = ['🚀', '✈️', '🧭', '📷', '🏝️', '🖼️', '🗺️', '🌍', '🍹', '⛱️', '🧳', '🎒', '🌴', '🛫'];
+
+/** The reward celebration (see .gift-overlay): blur, gift box, lid off, travel emojis everywhere. */
+export function giftCelebration(done: () => void) {
+  if (still()) { done(); return; }
+  const o = document.createElement('div');
+  o.className = 'gift-overlay';
+  o.setAttribute('aria-hidden', 'true');
+  o.innerHTML = '<div class="gift-box"><div class="body"></div><div class="lid"></div></div>';
+  for (let i = 0; i < 80; i++) {
+    const e = document.createElement('span');
+    e.className = 'gift-fly';
+    e.textContent = TRAVEL[i % TRAVEL.length];
+    const a = Math.random() * Math.PI * 2, d = 25 + Math.random() * 45;   // distance in vmax
+    e.style.setProperty('--dx', `${Math.cos(a) * d}vmax`);
+    e.style.setProperty('--dy', `${Math.sin(a) * d}vmax`);
+    e.style.setProperty('--r', `${Math.round((Math.random() - 0.5) * 540)}deg`);
+    e.style.fontSize = `${22 + Math.random() * 20}px`;
+    e.style.animationDelay = `${1.5 + Math.random() * 0.35}s`;
+    o.appendChild(e);
+  }
+  document.body.appendChild(o);
+  setTimeout(() => { o.remove(); done(); }, 3600);
+}
+
 /** Confetti once when the page opens (`fire`), and again whenever the child is clicked. */
 export function Confetti({ fire, children, className }: { fire?: boolean; children?: React.ReactNode; className?: string }) {
   const done = useRef(false);

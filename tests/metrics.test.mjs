@@ -323,6 +323,27 @@ test('rewards are recorded at the post that reaches each step, once, and survive
   assert.equal((await one(`select count(*)::int n from rewards where student_id = $1`, [s])).n, 2);
 });
 
+test('stamps: the ones the client cannot test by hand (1 year, +1K and +10K in a month, 100 posts)', async () => {
+  const s = await student('Long Timer', 'long_timer', 'Hub', '2025-10-01');
+  await followers(s, '2026-11-01', 1000);
+  await followers(s, '2026-11-20', 12000);   // +11K in November
+  const days = ['2026-09', '2026-10', '2026-11'];
+  for (let i = 0; i < 100; i++) await post(s, `lt${i}`, `${days[i % 3]}-${String(1 + (i % 25)).padStart(2, '0')} ${String(8 + (i % 10)).padStart(2, '0')}:00`);
+  await db.exec(`select award_stamps()`);
+  const got = (await stampsOf(s)).map((x) => x.stamp);
+  for (const k of ['golden_wings', 'silver_wings', 'business_class', 'first_class', 'economy_premium', 'around_the_world', 'frequent_flyer'])
+    assert.ok(got.includes(k), `missing ${k}`);
+  // Just under each bar: none of them
+  const t = await student('Almost', 'almost_there', 'Hub', '2026-01-01');
+  await followers(t, '2026-11-01', 1000);
+  await followers(t, '2026-11-20', 1990);   // +990
+  for (let i = 0; i < 99; i++) await post(t, `al${i}`, `2026-10-${String(1 + (i % 28)).padStart(2, '0')} ${String(8 + (i % 10)).padStart(2, '0')}:00`);
+  await db.exec(`select award_stamps()`);
+  const none = (await stampsOf(t)).map((x) => x.stamp);
+  for (const k of ['golden_wings', 'business_class', 'first_class', 'around_the_world'])
+    assert.ok(!none.includes(k), `should not have ${k}`);
+});
+
 test('stamps: each family is earned once with its month, and never taken away', async () => {
   const s = await student('Stamp Star', 'stamp_star', 'Hub', '2026-05-01');
   await followers(s, '2026-11-01', 1000);

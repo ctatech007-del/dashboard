@@ -30,9 +30,10 @@ export default async function Challenge({ params }: { params: Promise<{ handle: 
   // Level = 1 + milestones reached (the client's rule)
   const level = 1 + REWARD_STEPS.filter((n) => n <= s.total_posts).length;
   const next = REWARD_STEPS.find((n) => n > s.total_posts);
-  // Rewards reached in the last 7 days get the gift-opening burst (see PostGrid)
-  const weekAgo = Date.now() - 7 * 864e5;
-  const recent = s.rewards.filter((r) => r.reached_at && Date.parse(r.reached_at) >= weekAgo).map((r) => r.step);
+  // Only rewards reached in the latest daily update get the celebration (see PostGrid): their post
+  // went up within the day before that update.
+  const since = s.updated_at ? Date.parse(s.updated_at) - 864e5 : Infinity;
+  const recent = s.rewards.filter((r) => r.reached_at && Date.parse(r.reached_at) >= since).map((r) => r.step);
 
   return (
     <>

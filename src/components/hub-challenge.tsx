@@ -3,7 +3,7 @@
 // bar filling along, and the grid whose gift circles open the first time they're reached.
 import { useEffect, useState } from 'react';
 import { REWARD_STEPS } from '@/lib/stamps';
-import { burst } from '@/components/hub-fx';
+import { giftCelebration } from '@/components/hub-fx';
 
 const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -46,9 +46,9 @@ export function ChallengeProgress({ total, posts }: { total: number; posts: numb
  * posted, navy gift circles with a breathing gold ring at the milestones) and Post 100 as a big
  * trophy circle centred underneath.
  *
- * Gift opening + emoji burst (the rule): it plays once per reward on each phone or computer, for
- * rewards reached in the last 7 days. So a student who reaches 10 posts sees it the next time they
- * open their page (even the very first time), and never again for that reward on that device.
+ * Gift celebration (the client's rule): only for a reward reached in the latest daily update, and only
+ * once per reward on each phone or computer. A student who reached 15 posts last week and is now at
+ * 20 sees nothing.
  */
 export function PostGrid({ total, handle, recent }: { total: number; handle: string; recent: number[] }) {
   const steps = new Set(REWARD_STEPS);
@@ -64,7 +64,7 @@ export function PostGrid({ total, handle, recent }: { total: number; handle: str
     const fresh = still() ? [] : recent.filter((s) => s <= total && !seen.includes(s));
     if (!fresh.length) return;
     setOpening(fresh);
-    const t = setTimeout(() => { burst(); setOpening([]); }, 1300);
+    const t = setTimeout(() => giftCelebration(() => setOpening([])), 400);
     return () => clearTimeout(t);
   }, [handle, total, recent]);
 
@@ -82,7 +82,7 @@ export function PostGrid({ total, handle, recent }: { total: number; handle: str
           const n = i + 1, done = n <= total, gift = steps.has(n), open = opening.includes(n);
           let look: string, body: React.ReactNode = n;
           if (gift && (!done || open)) {
-            look = `bg-[var(--hub-navy)] gold-pulse ${open ? 'gift-open' : ''}`;
+            look = `bg-[var(--hub-navy)] gold-ring ${open ? 'gift-open' : ''}`;
             body = <span className="gift-wiggle text-sm sm:text-lg">🎁</span>;
           } else if (done) {
             look = `bg-good text-white shadow-[inset_0_-3px_0_rgba(0,0,0,0.15)] ${gift ? 'ring-2 sm:ring-[3px] ring-gold' : ''}`;
@@ -100,7 +100,7 @@ export function PostGrid({ total, handle, recent }: { total: number; handle: str
         })}
       </ol>
       <div className="mt-6 sm:mt-8 flex flex-col items-center" title="Post 100: the finish line">
-        <span className={`grid place-items-center size-20 sm:size-28 rounded-full text-white ${done100 ? 'bg-good glow' : 'bg-[var(--hub-navy)] gold-pulse'}`}>
+        <span className={`grid place-items-center size-20 sm:size-28 rounded-full text-white ${done100 ? 'bg-good glow' : 'bg-[var(--hub-navy)] gold-ring'}`}>
           {done100 ? check('size-9 sm:size-12') : <span className="gift-wiggle text-4xl sm:text-5xl">🏆</span>}
         </span>
         <span className="mt-2.5 text-xs sm:text-sm font-extrabold tracking-[0.18em] uppercase text-[#c8962a]">Post 100</span>

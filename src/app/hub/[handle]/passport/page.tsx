@@ -69,10 +69,10 @@ export default async function Passport({ params }: { params: Promise<{ handle: s
         </div>
         <div className="mt-3 sm:mt-4">
           <p className="text-[8px] sm:text-[10px] font-semibold tracking-[0.14em] uppercase text-[#8a7a68]">Signature of holder</p>
-          {/* Never clipped: the line sits under the writing, loops may cross it like a real signature,
-              and long names get a smaller hand so they always fit on the line */}
-          <div className="mt-5 sm:mt-7 border-b border-[#bfb09a]">
-            <p className="whitespace-nowrap leading-[1.35] -mb-1.5 text-[#25366a] text-[length:calc(var(--sig)*var(--fit))] [--sig:1.85rem] sm:[--sig:3rem]"
+          {/* The line is in the same place for every name; the signature sits centred between the label
+              and the line, never clipped (long names get a smaller hand so they fit) */}
+          <div className="mt-3 sm:mt-4 flex h-[2.6rem] sm:h-[4.3rem] items-center border-b border-[#bfb09a]">
+            <p className="whitespace-nowrap leading-[1.35] text-[#25366a] text-[length:calc(var(--sig)*var(--fit))] [--sig:1.85rem] sm:[--sig:3rem]"
               style={{ fontFamily: 'var(--font-signature), cursive', '--fit': Math.min(1, 15 / Math.max(signature.length, 1)) } as React.CSSProperties}>
               {signature}
             </p>
